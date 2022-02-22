@@ -18,10 +18,8 @@ package rpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"unicode"
@@ -212,16 +210,12 @@ func (c *callback) call(ctx context.Context, method string, args []reflect.Value
 	}
 
 	// Catch panic while running the callback.
-	defer func() {
-		if err := recover(); err != nil {
-			const size = 64 << 10
-			buf := make([]byte, size)
-			buf = buf[:runtime.Stack(buf, false)]
-			log.Error("RPC method " + method + " crashed: " + fmt.Sprintf("%v\n%s", err, buf))
-			errRes = errors.New("method handler crashed")
-			//debug.WriteStackTraceOnPanic(string(buf))
-		}
-	}()
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		log.Error("RPC method " + method + " crashed: " + fmt.Sprintf("%v\n%s", err, dbg.Stack()))
+	//		errRes = errors.New("method handler crashed")
+	//	}
+	//}()
 	// Run the callback.
 	results := c.fn.Call(fullargs)
 	if len(results) == 0 {

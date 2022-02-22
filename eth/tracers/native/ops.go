@@ -43,7 +43,7 @@ type opsCallFrame struct {
 	To      string          `json:"to,omitempty"`
 	Value   string          `json:"value,omitempty"`
 	GasIn   string          `json:"gasIn"`
-	GasCost string          `json:"gasUsed"`
+	GasCost string          `json:"gasCost"`
 	Input   string          `json:"input"`
 	Output  string          `json:"output,omitempty"`
 	Error   string          `json:"error,omitempty"`
@@ -57,6 +57,7 @@ type opsTracer struct {
 	currentFrame *opsCallFrame
 	interrupt    uint32 // Atomic flag to signal execution interruption
 	reason       error  // Textual reason for the interruption
+	initialized  bool
 }
 
 // newOpsTracer returns a native go tracer which tracks
@@ -71,7 +72,10 @@ func NewOpsTracer() vm.Tracer {
 func (t *opsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address,
 	precompile, create bool, callType vm.CallType, input []byte, gas uint64,
 	value *big.Int, code []byte) {
-	fmt.Println("CaptureStart", env, from, to, create, input, gas, value)
+
+	if t.initialized {
+		return
+	}
 	t.callstack = opsCallFrame{
 		Type:  "CALL",
 		From:  addrToHex(from),
@@ -85,20 +89,24 @@ func (t *opsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	}
 	t.currentDepth = depth
 	t.currentFrame = &t.callstack
+	fmt.Println("CaptureStart", depth, t.callstack.Type)
+	t.initialized = true
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
 func (t *opsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
-	fmt.Println("CaptureEnd", output, startGas, endGas, err)
-	t.callstack.GasCost = uintToHex(startGas - endGas)
+	fmt.Println("CaptureEnd", depth, err)
+	t.currentFrame.GasCost = uintToHex(startGas - endGas)
 	if err != nil {
-		t.callstack.Error = err.Error()
+		t.currentFrame.Error = err.Error()
 		if err.Error() == "execution reverted" && len(output) > 0 {
-			t.callstack.Output = bytesToHex(output)
+			t.currentFrame.Output = bytesToHex(output)
 		}
 	} else {
-		t.callstack.Output = bytesToHex(output)
+		t.currentFrame.Output = bytesToHex(output)
 	}
+	t.currentFrame = t.currentFrame.parent
+	t.currentDepth -= 1
 }
 
 // Note the result has no "0x" prefix
@@ -121,13 +129,10 @@ func (t *opsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
 func (t *opsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+	fmt.Println("CaptureState", depth, op.String())
 	if err != nil {
 		t.reason = err
 		return
-	}
-	if depth < t.currentDepth {
-		t.currentFrame = t.currentFrame.parent
-		t.currentDepth -= 1
 	}
 	if op == vm.LOG0 || op == vm.LOG1 || op == vm.LOG2 || op == vm.LOG3 || op == vm.LOG4 {
 		var topic0, topic1, topic2, topic3, logInput string
@@ -231,6 +236,7 @@ func (t *opsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 		t.currentFrame = &frame
+		t.currentDepth += 1
 		return
 	case vm.DELEGATECALL, vm.STATICCALL:
 		var to common.Address = scope.Stack.Back(1).Bytes20()
@@ -250,6 +256,7 @@ func (t *opsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 		t.currentFrame = &frame
+		t.currentDepth += 1
 		return
 	}
 }
