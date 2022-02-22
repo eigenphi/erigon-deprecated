@@ -171,7 +171,10 @@ func TraceTx(
 		stream.WriteString(returnVal)
 		stream.WriteObjectEnd()
 	} else {
-		if r, err1 := tracer.(*tracers.Tracer).GetResult(); err1 == nil {
+		if t, ok := tracer.(*native.OpsTracer); ok {
+			result, _ := t.GetResult()
+			stream.Write(result)
+		} else if r, err1 := tracer.(*tracers.Tracer).GetResult(); err1 == nil {
 			stream.Write(r)
 		} else {
 			return err1
