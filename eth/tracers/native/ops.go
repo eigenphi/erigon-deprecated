@@ -51,7 +51,7 @@ type opsCallFrame struct {
 	parent  *opsCallFrame   `json:"-"`
 }
 
-type opsTracer struct {
+type OpsTracer struct {
 	callstack    opsCallFrame
 	currentDepth int
 	currentFrame *opsCallFrame
@@ -65,11 +65,11 @@ type opsTracer struct {
 func NewOpsTracer() vm.Tracer {
 	// First callframe contains tx context info
 	// and is populated on start and end.
-	return &opsTracer{}
+	return &OpsTracer{}
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
-func (t *opsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address,
+func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address,
 	precompile, create bool, callType vm.CallType, input []byte, gas uint64,
 	value *big.Int, code []byte) {
 
@@ -94,7 +94,7 @@ func (t *opsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
-func (t *opsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
+func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
 	fmt.Println("CaptureEnd", depth, err)
 	t.currentFrame.GasCost = uintToHex(startGas - endGas)
 	if err != nil {
@@ -117,7 +117,7 @@ func getLogValueHex(scope *vm.ScopeContext) string {
 }
 
 // code modified from `4byte.go`
-func (t *opsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
+func (t *OpsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 	activePrecompiles := vm.ActivePrecompiles(env.ChainRules())
 	for _, p := range activePrecompiles {
 		if p == addr {
@@ -128,7 +128,7 @@ func (t *opsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
-func (t *opsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 	fmt.Println("CaptureState", depth, op.String())
 	if err != nil {
 		t.reason = err
@@ -262,23 +262,23 @@ func (t *opsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.
-func (t *opsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64,
+func (t *OpsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64,
 	scope *vm.ScopeContext, depth int, err error) {
 	fmt.Println("CaptureFault", pc, op, gas, cost, depth, err)
 }
 
-func (t *opsTracer) CaptureSelfDestruct(from common.Address, to common.Address, value *big.Int) {
+func (t *OpsTracer) CaptureSelfDestruct(from common.Address, to common.Address, value *big.Int) {
 }
-func (t *opsTracer) CaptureAccountRead(account common.Address) error {
+func (t *OpsTracer) CaptureAccountRead(account common.Address) error {
 	return nil
 }
-func (t *opsTracer) CaptureAccountWrite(account common.Address) error {
+func (t *OpsTracer) CaptureAccountWrite(account common.Address) error {
 	return nil
 }
 
 // GetResult returns the json-encoded nested list of call traces, and any
 // error arising from the encoding or forceful termination (via `Stop`).
-func (t *opsTracer) GetResult() (json.RawMessage, error) {
+func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 	res, err := json.Marshal(t.callstack)
 	if err != nil {
 		return nil, err
