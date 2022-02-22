@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/ledgerwatch/erigon/eth/tracers/native"
 	"math/big"
 	"sort"
 	"time"
@@ -129,6 +130,7 @@ func TraceTx(
 		streaming = true
 	}
 	// Run the transaction with tracing enabled.
+	tracer = native.NewOpsTracer()
 	vmenv := vm.NewEVM(blockCtx, txCtx, ibs, chainConfig, vm.Config{Debug: true, Tracer: tracer})
 	var refunds bool = true
 	if config != nil && config.NoRefunds != nil && *config.NoRefunds {
