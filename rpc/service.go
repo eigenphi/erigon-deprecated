@@ -18,7 +18,6 @@ package rpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -26,7 +25,6 @@ import (
 	"unicode"
 
 	jsoniter "github.com/json-iterator/go"
-	"github.com/ledgerwatch/erigon-lib/common/dbg"
 	"github.com/ledgerwatch/log/v3"
 )
 
@@ -212,12 +210,12 @@ func (c *callback) call(ctx context.Context, method string, args []reflect.Value
 	}
 
 	// Catch panic while running the callback.
-	defer func() {
-		if err := recover(); err != nil {
-			log.Error("RPC method " + method + " crashed: " + fmt.Sprintf("%v\n%s", err, dbg.Stack()))
-			errRes = errors.New("method handler crashed")
-		}
-	}()
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		log.Error("RPC method " + method + " crashed: " + fmt.Sprintf("%v\n%s", err, dbg.Stack()))
+	//		errRes = errors.New("method handler crashed")
+	//	}
+	//}()
 	// Run the callback.
 	results := c.fn.Call(fullargs)
 	if len(results) == 0 {
