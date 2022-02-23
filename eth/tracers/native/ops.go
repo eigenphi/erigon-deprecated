@@ -79,7 +79,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 
 	fmt.Println("CaptureStart", depth, callType)
 	if callType == vm.CREATE2T {
-		create2Frame := t.currentFrame.parent
+		create2Frame := t.currentFrame
 		codeHash := crypto.Keccak256Hash(input)
 		contractAddr := crypto.CreateAddress2(
 			common.HexToAddress(create2Frame.From),
