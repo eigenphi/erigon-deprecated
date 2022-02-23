@@ -37,6 +37,7 @@ const (
 )
 
 type opsCallFrame struct {
+	TxHash  string          `json:"tx_hash,omitempty"`
 	Type    string          `json:"type"`
 	Label   string          `json:"label"`
 	From    string          `json:"from"`
@@ -77,12 +78,13 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 		return
 	}
 	t.callstack = opsCallFrame{
-		Type:  "CALL",
-		From:  addrToHex(from),
-		To:    addrToHex(to),
-		Input: bytesToHex(input),
-		GasIn: uintToHex(gas),
-		Value: bigToHex(value),
+		TxHash: env.TxContext().TxHash.String(),
+		Type:   "CALL",
+		From:   addrToHex(from),
+		To:     addrToHex(to),
+		Input:  bytesToHex(input),
+		GasIn:  uintToHex(gas),
+		Value:  bigToHex(value),
 	}
 	if create {
 		t.callstack.Type = "CREATE"
@@ -96,6 +98,10 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 // CaptureEnd is called after the call finishes to finalize the tracing.
 func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
 	fmt.Println("CaptureEnd", depth, err)
+	// precompiled calls don't have a callframe
+	if depth == t.currentDepth {
+		return
+	}
 	t.currentFrame.GasCost = uintToHex(startGas - endGas)
 	if err != nil {
 		t.currentFrame.Error = err.Error()
