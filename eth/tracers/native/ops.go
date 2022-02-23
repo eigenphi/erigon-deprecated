@@ -57,6 +57,7 @@ type OpsTracer struct {
 	interrupt    uint32 // Atomic flag to signal execution interruption
 	reason       error  // Textual reason for the interruption
 	initialized  bool
+	lastOp       vm.OpCode
 }
 
 // newOpsTracer returns a native go tracer which tracks
@@ -75,6 +76,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	if t.initialized {
 		return
 	}
+	t.lastOp = vm.CALL
 	t.callstack = opsCallFrame{
 		Type:  "CALL",
 		From:  addrToHex(from),
@@ -84,6 +86,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	}
 	if create {
 		t.callstack.Type = "CREATE"
+		t.lastOp = vm.CREATE
 	}
 	t.currentDepth = depth + 1 // depth is the value before "CALL" or "CREATE"
 	t.currentFrame = &t.callstack
@@ -132,8 +135,16 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 	fmt.Println("CaptureState", depth, t.currentDepth, op.String())
 	if err != nil {
 		t.reason = err
+		if t.currentFrame != nil {
+			t.currentFrame.Error = err.Error()
+		}
 		return
 	}
+	if t.lastOp == vm.CREATE || t.lastOp == vm.CREATE2 {
+		t.currentFrame.parent.To = scope.Stack.Back(0).String()
+	}
+	t.lastOp = op
+
 	if op == vm.LOG0 || op == vm.LOG1 || op == vm.LOG2 || op == vm.LOG3 || op == vm.LOG4 {
 		var topic0, topic1, topic2, topic3, logInput string
 		switch op {
