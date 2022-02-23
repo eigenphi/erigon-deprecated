@@ -231,7 +231,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
 		}
-		if value.IsZero() {
+		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
