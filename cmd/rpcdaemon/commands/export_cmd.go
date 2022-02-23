@@ -71,6 +71,7 @@ func ExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Comma
 
 			debugImpl := NewPrivateDebugAPI(base, db, cfg.Gascap)
 			tracerName := "opsTracer"
+			ctx = context.WithValue(ctx, "logger", logger)
 			if err := debugImpl.TraceSingleBlock(ctx, startBlock, &tracers.TraceConfig{
 				Tracer: &tracerName,
 			}, stream); err != nil {

@@ -12,6 +12,7 @@ import (
 	"github.com/ledgerwatch/erigon/ethdb"
 	"github.com/ledgerwatch/erigon/rpc"
 	"github.com/ledgerwatch/erigon/turbo/transactions"
+	"github.com/ledgerwatch/log/v3"
 )
 
 // TraceBlockByStep implements debug_traceBlockByStep. Returns Geth style blocks traces with startNumber and step size.
@@ -86,6 +87,9 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 
 	signer := types.MakeSigner(chainConfig, block.NumberU64())
 	stream.WriteArrayStart()
+
+	logger := ctx.Value("logger").(log.Logger)
+
 	for idx, tx := range block.Transactions() {
 		select {
 		default:
@@ -95,6 +99,8 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		}
 		ibs.Prepare(tx.Hash(), block.Hash(), idx)
 		msg, _ := tx.AsMessage(*signer, block.BaseFee())
+
+		logger.Debug("trace tx : ", tx.Hash().String())
 
 		transactions.TraceTx(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig, stream)
 		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
