@@ -37,18 +37,18 @@ const (
 )
 
 type opsCallFrame struct {
-	Type    string          `json:"type"`
-	Label   string          `json:"label"`
-	From    string          `json:"from"`
-	To      string          `json:"to,omitempty"`
-	Value   string          `json:"value,omitempty"`
-	GasIn   string          `json:"gasIn"`
-	GasCost string          `json:"gasCost"`
-	Input   string          `json:"input,omitempty"`
-	Error   string          `json:"error,omitempty"`
-	Calls   []*opsCallFrame `json:"calls,omitempty"`
-	parent  *opsCallFrame   `json:"-"`
-	env     *vm.EVM         `json:"-"`
+	Type    string           `json:"type"`
+	Label   string           `json:"label"`
+	From    string           `json:"from"`
+	To      string           `json:"to,omitempty"`
+	Value   string           `json:"value,omitempty"`
+	GasIn   string           `json:"gasIn"`
+	GasCost string           `json:"gasCost"`
+	Input   string           `json:"input,omitempty"`
+	Error   string           `json:"error,omitempty"`
+	Calls   []*opsCallFrame  `json:"calls,omitempty"`
+	parent  *opsCallFrame    `json:"-"`
+	scope   *vm.ScopeContext `json:"-"`
 }
 
 type OpsTracer struct {
@@ -75,7 +75,6 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 
 	fmt.Println("CaptureStart", depth, t.currentFrame.Type)
 	if t.initialized {
-		t.currentFrame.parent.env = env
 		return
 	}
 	t.callstack = opsCallFrame{
@@ -84,7 +83,6 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 		To:    addrToHex(to),
 		GasIn: uintToHex(gas),
 		Value: bigToHex(value),
-		env:   env,
 	}
 	if create {
 		t.callstack.Type = "CREATE"
@@ -109,7 +107,7 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 	t.currentDepth -= 1
 
 	if t.currentFrame.Type == "CREATE" || t.currentFrame.Type == "CREATE2" {
-		t.currentFrame.To = "0x" + hex.EncodeToString(output)
+		t.currentFrame.To = t.currentFrame.scope.Stack.Back(0).String()
 	}
 }
 
@@ -196,6 +194,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
 			parent:  t.currentFrame,
+			scope:   scope,
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
