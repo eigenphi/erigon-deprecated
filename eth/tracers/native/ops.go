@@ -20,6 +20,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/holiman/uint256"
+	"github.com/ledgerwatch/erigon/crypto"
 	"math/big"
 	"strconv"
 	"strings"
@@ -49,6 +51,8 @@ type opsCallFrame struct {
 	Calls   []*opsCallFrame  `json:"calls,omitempty"`
 	parent  *opsCallFrame    `json:"-"`
 	scope   *vm.ScopeContext `json:"-"`
+	code    []byte           `json:"-"` // for calculating CREATE2 contract address
+	salt    *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
 }
 
 type OpsTracer struct {
@@ -74,6 +78,15 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	value *big.Int, code []byte) {
 
 	fmt.Println("CaptureStart", depth, callType)
+	if callType == vm.CREATE2T {
+		create2Frame := t.currentFrame.parent
+		codeHash := crypto.Keccak256Hash(input)
+		contractAddr := crypto.CreateAddress2(
+			common.HexToAddress(create2Frame.From),
+			common.Hash(create2Frame.salt.Bytes32()),
+			codeHash.Bytes())
+		create2Frame.To = contractAddr.String()
+	}
 	if t.initialized {
 		return
 	}
@@ -102,9 +115,6 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 	t.currentFrame.GasCost = uintToHex(startGas - endGas)
 	if err != nil {
 		t.currentFrame.Error = err.Error()
-	}
-	if t.currentFrame.Type == "CREATE" || t.currentFrame.Type == "CREATE2" {
-		t.currentFrame.To = t.currentFrame.scope.Stack.Back(0).String()
 	}
 
 	t.currentFrame = t.currentFrame.parent
@@ -187,14 +197,22 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 	switch op {
 	case vm.CREATE, vm.CREATE2:
 		value := scope.Stack.Back(0)
+		from := scope.Contract.Address()
 		frame := opsCallFrame{
 			Type:    op.String(),
-			From:    scope.Contract.Address().String(),
+			From:    from.String(),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
 			parent:  t.currentFrame,
 			scope:   scope,
+		}
+		if op == vm.CREATE {
+			nonce := env.IntraBlockState().GetNonce(from)
+			frame.To = crypto.CreateAddress(from, nonce).String()
+		}
+		if op == vm.CREATE2 {
+			frame.salt = scope.Stack.Back(3)
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
