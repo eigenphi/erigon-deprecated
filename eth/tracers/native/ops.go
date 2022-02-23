@@ -73,7 +73,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	precompile, create bool, callType vm.CallType, input []byte, gas uint64,
 	value *big.Int, code []byte) {
 
-	fmt.Println("CaptureStart", depth, t.currentFrame.Type)
+	fmt.Println("CaptureStart", depth, callType)
 	if t.initialized {
 		return
 	}
@@ -103,12 +103,12 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 	if err != nil {
 		t.currentFrame.Error = err.Error()
 	}
-	t.currentFrame = t.currentFrame.parent
-	t.currentDepth -= 1
-
 	if t.currentFrame.Type == "CREATE" || t.currentFrame.Type == "CREATE2" {
 		t.currentFrame.To = t.currentFrame.scope.Stack.Back(0).String()
 	}
+
+	t.currentFrame = t.currentFrame.parent
+	t.currentDepth -= 1
 }
 
 // Note the result has no "0x" prefix
