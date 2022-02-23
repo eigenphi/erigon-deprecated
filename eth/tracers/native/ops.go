@@ -48,6 +48,7 @@ type opsCallFrame struct {
 	Error   string          `json:"error,omitempty"`
 	Calls   []*opsCallFrame `json:"calls,omitempty"`
 	parent  *opsCallFrame   `json:"-"`
+	env     *vm.EVM         `json:"-"`
 }
 
 type OpsTracer struct {
@@ -57,7 +58,6 @@ type OpsTracer struct {
 	interrupt    uint32 // Atomic flag to signal execution interruption
 	reason       error  // Textual reason for the interruption
 	initialized  bool
-	lastOp       vm.OpCode
 }
 
 // newOpsTracer returns a native go tracer which tracks
@@ -73,24 +73,24 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	precompile, create bool, callType vm.CallType, input []byte, gas uint64,
 	value *big.Int, code []byte) {
 
+	fmt.Println("CaptureStart", depth, t.currentFrame.Type)
 	if t.initialized {
+		t.currentFrame.parent.env = env
 		return
 	}
-	t.lastOp = vm.CALL
 	t.callstack = opsCallFrame{
 		Type:  "CALL",
 		From:  addrToHex(from),
 		To:    addrToHex(to),
 		GasIn: uintToHex(gas),
 		Value: bigToHex(value),
+		env:   env,
 	}
 	if create {
 		t.callstack.Type = "CREATE"
-		t.lastOp = vm.CREATE
 	}
 	t.currentDepth = depth + 1 // depth is the value before "CALL" or "CREATE"
 	t.currentFrame = &t.callstack
-	fmt.Println("CaptureStart", depth, t.callstack.Type)
 	t.initialized = true
 }
 
@@ -107,6 +107,10 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 	}
 	t.currentFrame = t.currentFrame.parent
 	t.currentDepth -= 1
+
+	if t.currentFrame.Type == "CREATE" || t.currentFrame.Type == "CREATE2" {
+		t.currentFrame.To = "0x" + hex.EncodeToString(output)
+	}
 }
 
 // Note the result has no "0x" prefix
@@ -140,10 +144,6 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		return
 	}
-	if t.lastOp == vm.CREATE || t.lastOp == vm.CREATE2 {
-		t.currentFrame.parent.To = scope.Stack.Back(0).String()
-	}
-	t.lastOp = op
 
 	if op == vm.LOG0 || op == vm.LOG1 || op == vm.LOG2 || op == vm.LOG3 || op == vm.LOG4 {
 		var topic0, topic1, topic2, topic3, logInput string
