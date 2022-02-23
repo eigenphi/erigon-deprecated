@@ -44,7 +44,7 @@ type opsCallFrame struct {
 	Value   string          `json:"value,omitempty"`
 	GasIn   string          `json:"gasIn"`
 	GasCost string          `json:"gasCost"`
-	Input   string          `json:"input"`
+	Input   string          `json:"input,omitempty"`
 	Error   string          `json:"error,omitempty"`
 	Calls   []*opsCallFrame `json:"calls,omitempty"`
 	parent  *opsCallFrame   `json:"-"`
@@ -110,6 +110,9 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 func getLogValueHex(scope *vm.ScopeContext) string {
 	offset := scope.Stack.Back(0).Uint64()
 	length := scope.Stack.Back(1).Uint64()
+	if scope.Memory.Len() < int(offset+length) {
+		scope.Memory.Resize(offset + length)
+	}
 	return hex.EncodeToString(scope.Memory.Data()[offset : offset+length])
 }
 
