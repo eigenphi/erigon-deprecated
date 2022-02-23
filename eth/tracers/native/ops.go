@@ -45,7 +45,6 @@ type opsCallFrame struct {
 	GasIn   string          `json:"gasIn"`
 	GasCost string          `json:"gasCost"`
 	Input   string          `json:"input"`
-	Output  string          `json:"output,omitempty"`
 	Error   string          `json:"error,omitempty"`
 	Calls   []*opsCallFrame `json:"calls,omitempty"`
 	parent  *opsCallFrame   `json:"-"`
@@ -80,7 +79,6 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 		Type:  "CALL",
 		From:  addrToHex(from),
 		To:    addrToHex(to),
-		Input: bytesToHex(input),
 		GasIn: uintToHex(gas),
 		Value: bigToHex(value),
 	}
@@ -103,11 +101,6 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 	t.currentFrame.GasCost = uintToHex(startGas - endGas)
 	if err != nil {
 		t.currentFrame.Error = err.Error()
-		if err.Error() == "execution reverted" && len(output) > 0 {
-			t.currentFrame.Output = bytesToHex(output)
-		}
-	} else {
-		t.currentFrame.Output = bytesToHex(output)
 	}
 	t.currentFrame = t.currentFrame.parent
 	t.currentDepth -= 1
@@ -182,12 +175,9 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 	switch op {
 	case vm.CREATE, vm.CREATE2:
 		value := scope.Stack.Back(0)
-		offset := scope.Stack.Back(1).Uint64()
-		length := scope.Stack.Back(2).Uint64()
 		frame := opsCallFrame{
 			Type:    op.String(),
 			From:    scope.Contract.Address().String(),
-			Input:   hex.EncodeToString(scope.Memory.Data()[offset : offset+length]),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
@@ -222,15 +212,12 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		if t.isPrecompiled(env, to) {
 			return
 		}
-		argOffset := scope.Stack.Back(3).Uint64()
-		argLength := scope.Stack.Back(4).Uint64()
 		value := scope.Stack.Back(2)
 		frame := opsCallFrame{
 			Type:    op.String(),
 			From:    scope.Contract.Address().String(),
 			To:      to.String(),
 			Value:   value.String(),
-			Input:   hex.EncodeToString(scope.Memory.Data()[argOffset : argOffset+argLength]),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
@@ -247,13 +234,10 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		if t.isPrecompiled(env, to) {
 			return
 		}
-		argOffset := scope.Stack.Back(2).Uint64()
-		argLength := scope.Stack.Back(3).Uint64()
 		frame := opsCallFrame{
 			Type:    op.String(),
 			From:    scope.Contract.Address().String(),
 			To:      to.String(),
-			Input:   hex.EncodeToString(scope.Memory.Data()[argOffset : argOffset+argLength]),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
