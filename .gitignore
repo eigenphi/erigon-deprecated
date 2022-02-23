@@ -72,3 +72,4 @@ libmdbx/build/*
 tests/testdata/*
 
 go.work
+*.log
