@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/ledgerwatch/erigon/eth/tracers/native"
 	"math/big"
 	"sort"
 	"time"
@@ -105,17 +106,21 @@ func TraceTx(
 			}
 		}
 		// Construct the JavaScript tracer to execute with
-		if tracer, err = tracers.New(*config.Tracer, &tracers.Context{
-			TxHash: txCtx.TxHash,
-		}); err != nil {
-			stream.WriteNil()
-			return err
-		}
+		tracer = native.NewOpsTracer()
+		//if tracer, err = tracers.New(*config.Tracer, &tracers.Context{
+		//	TxHash: txCtx.TxHash,
+		//}); err != nil {
+		//	stream.WriteNil()
+		//	return err
+		//}
+
 		// Handle timeouts and RPC cancellations
 		deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
 		go func() {
 			<-deadlineCtx.Done()
-			tracer.(*tracers.Tracer).Stop(errors.New("execution timeout"))
+			if t, ok := tracer.(*tracers.Tracer); ok {
+				t.Stop(errors.New("execution timeout"))
+			}
 		}()
 		defer cancel()
 		streaming = false
@@ -166,7 +171,10 @@ func TraceTx(
 		stream.WriteString(returnVal)
 		stream.WriteObjectEnd()
 	} else {
-		if r, err1 := tracer.(*tracers.Tracer).GetResult(); err1 == nil {
+		if t, ok := tracer.(*native.OpsTracer); ok {
+			result, _ := t.GetResult()
+			stream.Write(result)
+		} else if r, err1 := tracer.(*tracers.Tracer).GetResult(); err1 == nil {
 			stream.Write(r)
 		} else {
 			return err1
