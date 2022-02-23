@@ -74,7 +74,7 @@ var (
 	}
 	traceFlag = cli.StringFlag{
 		Name:  "trace",
-		Usage: "Write execution trace to the given file",
+		Usage: "Write execution trace to the given file ( This is golang runtime trace, like runtime garbage collection and goroutine schedule )",
 	}
 )
 
