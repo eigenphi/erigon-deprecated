@@ -37,7 +37,6 @@ const (
 )
 
 type opsCallFrame struct {
-	TxHash  string          `json:"tx_hash,omitempty"`
 	Type    string          `json:"type"`
 	Label   string          `json:"label"`
 	From    string          `json:"from"`
@@ -78,18 +77,17 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 		return
 	}
 	t.callstack = opsCallFrame{
-		TxHash: env.TxContext().TxHash.String(),
-		Type:   "CALL",
-		From:   addrToHex(from),
-		To:     addrToHex(to),
-		Input:  bytesToHex(input),
-		GasIn:  uintToHex(gas),
-		Value:  bigToHex(value),
+		Type:  "CALL",
+		From:  addrToHex(from),
+		To:    addrToHex(to),
+		Input: bytesToHex(input),
+		GasIn: uintToHex(gas),
+		Value: bigToHex(value),
 	}
 	if create {
 		t.callstack.Type = "CREATE"
 	}
-	t.currentDepth = depth
+	t.currentDepth = depth + 1 // depth is the value before "CALL" or "CREATE"
 	t.currentFrame = &t.callstack
 	fmt.Println("CaptureStart", depth, t.callstack.Type)
 	t.initialized = true
@@ -97,7 +95,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
 func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
-	fmt.Println("CaptureEnd", depth, err)
+	fmt.Println("CaptureEnd", depth, t.currentDepth, err)
 	// precompiled calls don't have a callframe
 	if depth == t.currentDepth {
 		return
@@ -135,7 +133,7 @@ func (t *OpsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
 func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
-	fmt.Println("CaptureState", depth, op.String())
+	fmt.Println("CaptureState", depth, t.currentDepth, op.String())
 	if err != nil {
 		t.reason = err
 		return
