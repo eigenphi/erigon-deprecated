@@ -22,7 +22,7 @@ func (api *PrivateDebugAPIImpl) TraceBlockByStep(ctx context.Context, startBlock
 	}
 
 	for block := startBlock; block <= startBlock+step; block++ {
-		err := api.traceSingleBlock(ctx, block, config, stream)
+		err := api.TraceSingleBlock(ctx, block, config, stream)
 		if err != nil {
 			stream.Write(nil)
 			return err
@@ -40,7 +40,7 @@ func (api *PrivateDebugAPIImpl) TraceBlockByRange(ctx context.Context, startBloc
 	// TODO check endBlock less or equal than latest height
 
 	for block := startBlockNumber; block <= endBlockNumber; block++ {
-		err := api.traceSingleBlock(ctx, block, config, stream)
+		err := api.TraceSingleBlock(ctx, block, config, stream)
 		if err != nil {
 			stream.Write(nil)
 			return err
@@ -49,7 +49,7 @@ func (api *PrivateDebugAPIImpl) TraceBlockByRange(ctx context.Context, startBloc
 	return nil
 }
 
-func (api *PrivateDebugAPIImpl) traceSingleBlock(ctx context.Context, blockNr rpc.BlockNumber, config *tracers.TraceConfig, stream *jsoniter.Stream) error {
+func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rpc.BlockNumber, config *tracers.TraceConfig, stream *jsoniter.Stream) error {
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
 		stream.WriteNil()
