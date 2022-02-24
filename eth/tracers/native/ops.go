@@ -19,7 +19,6 @@ package native
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon/crypto"
 	"math/big"
@@ -31,28 +30,27 @@ import (
 	"github.com/ledgerwatch/erigon/core/vm"
 )
 
-// FIXME: call stack hierarchy has not been properly handled
-
 const (
 	LabelTransfer         = "Transfer"
 	LabelInternalTransfer = "Internal-Transfer"
 )
 
 type opsCallFrame struct {
-	Type    string           `json:"type"`
-	Label   string           `json:"label"`
-	From    string           `json:"from"`
-	To      string           `json:"to,omitempty"`
-	Value   string           `json:"value,omitempty"`
-	GasIn   string           `json:"gasIn"`
-	GasCost string           `json:"gasCost"`
-	Input   string           `json:"input,omitempty"`
-	Error   string           `json:"error,omitempty"`
-	Calls   []*opsCallFrame  `json:"calls,omitempty"`
-	parent  *opsCallFrame    `json:"-"`
-	scope   *vm.ScopeContext `json:"-"`
-	code    []byte           `json:"-"` // for calculating CREATE2 contract address
-	salt    *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
+	Type            string           `json:"type"`
+	Label           string           `json:"label"`
+	From            string           `json:"from"`
+	To              string           `json:"to,omitempty"`
+	ContractCreated string           `json:"contract_created,omitempty"`
+	Value           string           `json:"value,omitempty"`
+	GasIn           string           `json:"gasIn"`
+	GasCost         string           `json:"gasCost"`
+	Input           string           `json:"input,omitempty"`
+	Error           string           `json:"error,omitempty"`
+	Calls           []*opsCallFrame  `json:"calls,omitempty"`
+	parent          *opsCallFrame    `json:"-"`
+	scope           *vm.ScopeContext `json:"-"`
+	code            []byte           `json:"-"` // for calculating CREATE2 contract address
+	salt            *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
 }
 
 type OpsTracer struct {
@@ -77,7 +75,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	precompile, create bool, callType vm.CallType, input []byte, gas uint64,
 	value *big.Int, code []byte) {
 
-	fmt.Println("CaptureStart", depth, callType)
+	//fmt.Println("CaptureStart", depth, callType)
 	if callType == vm.CREATE2T {
 		create2Frame := t.currentFrame
 		codeHash := crypto.Keccak256Hash(input)
@@ -85,7 +83,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 			common.HexToAddress(create2Frame.From),
 			common.Hash(create2Frame.salt.Bytes32()),
 			codeHash.Bytes())
-		create2Frame.To = contractAddr.String()
+		create2Frame.ContractCreated = contractAddr.String()
 	}
 	if t.initialized {
 		return
@@ -107,7 +105,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
 func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
-	fmt.Println("CaptureEnd", depth, t.currentDepth, err)
+	//fmt.Println("CaptureEnd", depth, t.currentDepth, err)
 	// precompiled calls don't have a callframe
 	if depth == t.currentDepth {
 		return
@@ -144,7 +142,7 @@ func (t *OpsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
 func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
-	fmt.Println("CaptureState", depth, t.currentDepth, op.String())
+	//fmt.Println("CaptureState", depth, t.currentDepth, op.String())
 	if err != nil {
 		t.reason = err
 		if t.currentFrame != nil {
@@ -209,7 +207,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		if op == vm.CREATE {
 			nonce := env.IntraBlockState().GetNonce(from)
-			frame.To = crypto.CreateAddress(from, nonce).String()
+			frame.ContractCreated = crypto.CreateAddress(from, nonce).String()
 		}
 		if op == vm.CREATE2 {
 			frame.salt = scope.Stack.Back(3)
@@ -283,7 +281,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 // CaptureFault implements the EVMLogger interface to trace an execution fault.
 func (t *OpsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64,
 	scope *vm.ScopeContext, depth int, err error) {
-	fmt.Println("CaptureFault", pc, op, gas, cost, depth, err)
+	//fmt.Println("CaptureFault", pc, op, gas, cost, depth, err)
 }
 
 func (t *OpsTracer) CaptureSelfDestruct(from common.Address, to common.Address, value *big.Int) {
@@ -298,6 +296,9 @@ func (t *OpsTracer) CaptureAccountWrite(account common.Address) error {
 // GetResult returns the json-encoded nested list of call traces, and any
 // error arising from the encoding or forceful termination (via `Stop`).
 func (t *OpsTracer) GetResult() (json.RawMessage, error) {
+	if len(t.callstack.Error) != 0 {
+		t.callstack.Calls = []*opsCallFrame{}
+	}
 	res, err := json.Marshal(t.callstack)
 	if err != nil {
 		return nil, err
