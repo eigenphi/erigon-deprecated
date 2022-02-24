@@ -16,7 +16,7 @@ import (
 	"github.com/ledgerwatch/erigon/ethdb"
 	"github.com/ledgerwatch/erigon/rpc"
 	"github.com/ledgerwatch/erigon/turbo/transactions"
-	"github.com/ledgerwatch/log/v3"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"math/big"
 	"os"
@@ -96,8 +96,6 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 
 	signer := types.MakeSigner(chainConfig, block.NumberU64())
 
-	logger := ctx.Value("logger").(log.Logger)
-
 	out := json.NewEncoder(output)
 	for idx, tx := range block.Transactions() {
 		select {
@@ -108,12 +106,11 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		ibs.Prepare(tx.Hash(), block.Hash(), idx)
 		msg, _ := tx.AsMessage(*signer, block.BaseFee())
 
-		logger.Debug("trace tx : ", tx.Hash().String())
-
 		tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
 		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
 		if err != nil {
 			// TODO handle trace transaction error
+			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s", err)
 		}
 
 		var baseFee *big.Int
@@ -131,13 +128,10 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 				return fmt.Errorf("write protobuf data: %s", err)
 			}
 		} else {
-			if err := out.Encode(pbTx); err != nil {
+			if err := out.Encode(&pbTx); err != nil {
 				return fmt.Errorf("failed to encode transaction: %s", err)
 			}
 		}
-		//if _, err := output.WriteString("\n"); err != nil {
-		//	return fmt.Errorf("failed to write new line: %s", err)
-		//}
 	}
 	return nil
 }

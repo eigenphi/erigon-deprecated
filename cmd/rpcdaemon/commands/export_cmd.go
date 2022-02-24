@@ -7,8 +7,9 @@ import (
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli/httpcfg"
 	"github.com/ledgerwatch/erigon/eth/tracers"
 	"github.com/ledgerwatch/erigon/rpc"
-	"github.com/ledgerwatch/log/v3"
+	v3log "github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 )
@@ -121,24 +122,24 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 	//		},
 	//	}
 	//
+	zlog := zap.L().Sugar()
 	exportTx := &cobra.Command{
 		Use: "tx [start] [end(optional)]",
 		Example: `./rpcdaemon export tx 122 ( export tx only on height: 122)
 ./rpcdaemon export block 122 222 ( export tx from height: 122 to height: 222)`,
 		Args: cobra.RangeArgs(1, 2),
 		Run: func(cmd *cobra.Command, args []string) {
-			logger := log.New()
+			logger := v3log.New()
 
 			var startBlock, endBlock rpc.BlockNumber
 			_ = endBlock
 			if err := startBlock.UnmarshalJSON([]byte(args[0])); err != nil {
-				logger.Error("parse startBlock failed", err)
 				return
 			}
 			endBlock = startBlock
 			if len(args) == 2 {
 				if err := endBlock.UnmarshalJSON([]byte(args[1])); err != nil {
-					logger.Error("parse endBlock failed", err)
+					zlog.Errorf("parse endBlock failed %s", err)
 					return
 				}
 			}
@@ -146,7 +147,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			ctx := cmd.Context()
 			db, borDb, eth, txPool, mining, _, stateCache, blockReader, filters, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			if err != nil {
-				log.Error("Could not connect to DB", "error", err)
+				zlog.Errorf("Could not connect to DB: %s", err)
 				os.Exit(1)
 			}
 			_ = eth
@@ -177,24 +178,25 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			path := filepath.Join(outputDir, filename)
 			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
 			if err != nil {
-				logger.Error("open file failed", "error", err)
+				zlog.Errorf("open file failed: %s", err)
 				return
 			}
 			defer file.Close()
-
 			debugImpl := NewPrivateDebugAPI(base, db, cfg.Gascap)
+
 			tracerName := "opsTracer"
 			ctx = context.WithValue(ctx, "logger", logger)
 			for height := startBlock; height <= endBlock; height++ {
 				if err := debugImpl.TraceSingleBlock(ctx, startBlock, &tracers.TraceConfig{
 					Tracer: &tracerName,
 				}, file, outProtobuf); err != nil {
-					logger.Error("Could not trace block", "error", err)
+					zlog.Errorf("could not trace block: %s", err)
+
 				} else {
-					logger.Info("trace block %d success", height)
+					zlog.Infof("trace block %d success", height)
 				}
 			}
-			logger.Info("export transactions data to ", path)
+			zlog.Info("export transactions data to ", path)
 		},
 	}
 	//exportTrace.PersistentFlags().StringVar(&outputFile, "output", "", "output file to save export data")
