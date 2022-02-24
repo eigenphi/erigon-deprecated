@@ -139,12 +139,16 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 
 func toPbTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCallFrame) protobuf.Transaction {
 	txIdx, _ := strconv.ParseInt(rtx.TransactionIndex.String(), 10, 64)
+	var to string
+	if rtx.To != nil {
+		to = strings.ToLower(rtx.To.String())
+	}
 	return protobuf.Transaction{
 		BlockNumber:      rtx.BlockNumber.ToInt().Int64(),
 		TransactionHash:  rtx.Hash.String(),
 		TransactionIndex: int32(txIdx),
 		FromAddress:      strings.ToLower(rtx.From.String()),
-		ToAddress:        strings.ToLower(rtx.To.String()),
+		ToAddress:        to,
 		GasPrice:         rtx.GasPrice.ToInt().Int64(),
 		Input:            hexutil.Encode(tx.GetData()),
 		Nonce:            int64(tx.GetNonce()),
