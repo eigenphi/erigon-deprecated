@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"os"
 	"strconv"
+	"strings"
 )
 
 //// TraceBlockByStep implements debug_traceBlockByStep. Returns Geth style blocks traces with startNumber and step size.
@@ -142,8 +143,8 @@ func toPbTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCa
 		BlockNumber:      rtx.BlockNumber.ToInt().Int64(),
 		TransactionHash:  rtx.Hash.String(),
 		TransactionIndex: int32(txIdx),
-		FromAddress:      rtx.From.String(),
-		ToAddress:        rtx.To.String(),
+		FromAddress:      strings.ToLower(rtx.From.String()),
+		ToAddress:        strings.ToLower(rtx.To.String()),
 		GasPrice:         rtx.GasPrice.ToInt().Int64(),
 		Input:            hexutil.Encode(tx.GetData()),
 		Nonce:            int64(tx.GetNonce()),

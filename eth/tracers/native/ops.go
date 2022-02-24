@@ -181,7 +181,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			Label:   label,
-			From:    scope.Contract.Address().String(),
+			From:    strings.ToLower(scope.Contract.Address().String()),
 			Input:   logInput,
 			Value:   getLogValueHex(scope),
 			GasIn:   uintToHex(gas),
@@ -198,7 +198,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		from := scope.Contract.Address()
 		frame := OpsCallFrame{
 			Type:    op.String(),
-			From:    from.String(),
+			From:    strings.ToLower(from.String()),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
@@ -224,8 +224,8 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		value := env.IntraBlockState().GetBalance(scope.Contract.Address())
 		frame := OpsCallFrame{
 			Type:    op.String(),
-			From:    scope.Contract.Address().String(),
-			To:      scope.Stack.Back(0).String(),
+			From:    strings.ToLower(scope.Contract.Address().String()),
+			To:      strings.ToLower(scope.Stack.Back(0).String()),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
@@ -244,8 +244,8 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		value := scope.Stack.Back(2)
 		frame := OpsCallFrame{
 			Type:    op.String(),
-			From:    scope.Contract.Address().String(),
-			To:      to.String(),
+			From:    strings.ToLower(scope.Contract.Address().String()),
+			To:      strings.ToLower(to.String()),
 			Value:   value.String(),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
@@ -265,8 +265,8 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		frame := OpsCallFrame{
 			Type:    op.String(),
-			From:    scope.Contract.Address().String(),
-			To:      to.String(),
+			From:    strings.ToLower(scope.Contract.Address().String()),
+			To:      strings.ToLower(to.String()),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
@@ -307,6 +307,9 @@ func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 }
 
 func (t *OpsTracer) GetCallStack() *OpsCallFrame {
+	if len(t.callstack.Error) != 0 {
+		t.callstack.Calls = []*OpsCallFrame{}
+	}
 	return &t.callstack
 }
 
