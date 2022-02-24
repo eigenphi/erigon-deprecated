@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"path/filepath"
+	"runtime/trace"
 )
 
 var ExportCmd = &cobra.Command{
@@ -26,6 +27,10 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 		outJsonL    bool
 		outProtobuf bool
 		outputDir   string
+	)
+
+	var (
+		exportTrace string
 	)
 
 	//	exportTrace := &cobra.Command{
@@ -129,6 +134,17 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 ./rpcdaemon export block 122 222 ( export tx from height: 122 to height: 222)`,
 		Args: cobra.RangeArgs(1, 2),
 		Run: func(cmd *cobra.Command, args []string) {
+			if exportTrace != "" {
+				runtimeTrace, err := os.OpenFile(exportTrace, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+				if err != nil {
+					zlog.Errorf("open file %s %s", exportTrace, err)
+				}
+				if err := trace.Start(runtimeTrace); err != nil {
+					zlog.Errorf("start trace %s", err)
+				}
+				defer trace.Stop()
+			}
+		
 			logger := v3log.New()
 
 			var startBlock, endBlock rpc.BlockNumber
@@ -209,6 +225,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 	//xExportCmd.AddCommand(exportBlock)
 	//xExportCmd.AddCommand(exportTrace)
 	ExportCmd.AddCommand(exportTx)
+	ExportCmd.PersistentFlags().StringVar(&exportTrace, "runtime-trace", "", "golang process runtime trace")
 
 	return ExportCmd
 }

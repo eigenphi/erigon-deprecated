@@ -167,12 +167,11 @@ func toPbCallTrace(in *native.OpsCallFrame) *protobuf.StackFrame {
 		Label:           in.Label,
 		From:            in.From,
 		To:              in.To,
-		ContractCreated: "",
+		ContractCreated: in.ContractCreated,
 		Value:           in.Value,
 		Input:           in.Input,
-		Output:          "",
 		Error:           in.Error,
-		Calls:           nil,
+		Calls:           calls,
 	}
 
 }

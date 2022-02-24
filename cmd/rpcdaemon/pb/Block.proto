@@ -17,9 +17,8 @@ message  stackFrame {
   //  string gasIn = 6;
   //  string gasUsed = 7;
   string input = 8;
-  string output = 9;
-  string error = 10;
-  repeated stackFrame calls = 11;
+  string error = 9;
+  repeated stackFrame calls = 10;
 }
 
 message InternalTxn {
