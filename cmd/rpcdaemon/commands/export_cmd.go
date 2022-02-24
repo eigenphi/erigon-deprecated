@@ -10,6 +10,7 @@ import (
 	"github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 	"os"
+	"path/filepath"
 )
 
 var ExportCmd = &cobra.Command{
@@ -23,6 +24,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 	var (
 		outJsonL    bool
 		outProtobuf bool
+		outputDir   string
 	)
 
 	//	exportTrace := &cobra.Command{
@@ -171,7 +173,9 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			} else {
 				filename += ".jsonl"
 			}
-			file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
+
+			path := filepath.Join(outputDir, filename)
+			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
 			if err != nil {
 				logger.Error("open file failed", "error", err)
 				return
@@ -190,12 +194,15 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 					logger.Info("trace block %d success", height)
 				}
 			}
+			logger.Info("export transactions data to ", path)
 		},
 	}
 	//exportTrace.PersistentFlags().StringVar(&outputFile, "output", "", "output file to save export data")
 	//exportBlock.PersistentFlags().StringVar(&outputFile, "output", "", "output file to save export data")
 	exportTx.PersistentFlags().BoolVar(&outJsonL, "out-jsonl", true, "save export data as jsonl file")
 	exportTx.PersistentFlags().BoolVar(&outProtobuf, "out-proto", false, "save export data as protobuf serialized file")
+
+	exportTx.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
 
 	//xExportCmd.AddCommand(exportBlock)
 	//xExportCmd.AddCommand(exportTrace)
