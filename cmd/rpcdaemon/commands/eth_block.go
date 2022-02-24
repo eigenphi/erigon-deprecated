@@ -219,36 +219,6 @@ func (api *APIImpl) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber
 	return response, err
 }
 
-//func (api *APIImpl) getBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (*types.Block, error) {
-//	tx, err := api.db.BeginRo(ctx)
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer tx.Rollback()
-//	b, err := api.blockByRPCNumber(number, tx)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if b == nil {
-//		return nil, nil
-//	}
-//	additionalFields := make(map[string]interface{})
-//	td, err := rawdb.ReadTd(tx, b.Hash(), b.NumberU64())
-//	if err != nil {
-//		return nil, err
-//	}
-//	additionalFields["totalDifficulty"] = (*hexutil.Big)(td)
-//	response, err := ethapi.RPCMarshalBlock(b, true, fullTx, additionalFields)
-//
-//	if err == nil && number == rpc.PendingBlockNumber {
-//		// Pending blocks need to nil out a few fields
-//		for _, field := range []string{"hash", "nonce", "miner"} {
-//			response[field] = nil
-//		}
-//	}
-//	return response, err
-//}
-
 // GetBlockByHash implements eth_getBlockByHash. Returns information about a block given the block's hash.
 func (api *APIImpl) GetBlockByHash(ctx context.Context, numberOrHash rpc.BlockNumberOrHash, fullTx bool) (map[string]interface{}, error) {
 	if numberOrHash.BlockHash == nil {

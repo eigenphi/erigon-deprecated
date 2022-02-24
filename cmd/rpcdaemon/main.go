@@ -13,7 +13,7 @@ import (
 func main() {
 	cmd, cfg := cli.RootCommand()
 	rootCtx, rootCancel := common.RootContext()
-	cmd.AddCommand(commands.ExportCmd(cfg, rootCancel))
+	cmd.AddCommand(commands.GetExportCmd(cfg, rootCancel))
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		logger := log.New()
