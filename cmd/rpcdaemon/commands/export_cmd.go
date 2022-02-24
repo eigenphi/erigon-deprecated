@@ -192,7 +192,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			}
 
 			path := filepath.Join(outputDir, filename)
-			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 			if err != nil {
 				zlog.Errorf("open file failed: %s", err)
 				return
