@@ -1,14 +1,13 @@
 package main
 
 import (
-	"go.uber.org/zap"
-	"os"
-
 	"github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/commands"
 	"github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"os"
 )
 
 func init() {
