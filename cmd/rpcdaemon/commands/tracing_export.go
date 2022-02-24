@@ -99,7 +99,6 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 	logger := ctx.Value("logger").(log.Logger)
 
 	out := json.NewEncoder(output)
-	out.SetIndent("", " ")
 	for idx, tx := range block.Transactions() {
 		select {
 		default:
@@ -136,9 +135,9 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 				return fmt.Errorf("failed to encode transaction: %s", err)
 			}
 		}
-		if _, err := output.WriteString("\n"); err != nil {
-			return fmt.Errorf("failed to write new line: %s", err)
-		}
+		//if _, err := output.WriteString("\n"); err != nil {
+		//	return fmt.Errorf("failed to write new line: %s", err)
+		//}
 	}
 	return nil
 }
