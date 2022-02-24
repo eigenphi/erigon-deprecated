@@ -35,28 +35,27 @@ const (
 	LabelInternalTransfer = "Internal-Transfer"
 )
 
-type opsCallFrame struct {
-	Type            string           `json:"type"`
-	Label           string           `json:"label"`
-	From            string           `json:"from"`
-	To              string           `json:"to,omitempty"`
-	ContractCreated string           `json:"contract_created,omitempty"`
-	Value           string           `json:"value,omitempty"`
-	GasIn           string           `json:"gasIn"`
-	GasCost         string           `json:"gasCost"`
-	Input           string           `json:"input,omitempty"`
-	Error           string           `json:"error,omitempty"`
-	Calls           []*opsCallFrame  `json:"calls,omitempty"`
-	parent          *opsCallFrame    `json:"-"`
-	scope           *vm.ScopeContext `json:"-"`
-	code            []byte           `json:"-"` // for calculating CREATE2 contract address
-	salt            *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
+type OpsCallFrame struct {
+	Type    string           `json:"type"`
+	Label   string           `json:"label"`
+	From    string           `json:"from"`
+	To      string           `json:"to,omitempty"`
+	Value   string           `json:"value,omitempty"`
+	GasIn   string           `json:"gasIn"`
+	GasCost string           `json:"gasCost"`
+	Input   string           `json:"input,omitempty"`
+	Error   string           `json:"error,omitempty"`
+	Calls   []*OpsCallFrame  `json:"calls,omitempty"`
+	parent  *OpsCallFrame    `json:"-"`
+	scope   *vm.ScopeContext `json:"-"`
+	code    []byte           `json:"-"` // for calculating CREATE2 contract address
+	salt    *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
 }
 
 type OpsTracer struct {
-	callstack    opsCallFrame
+	callstack    OpsCallFrame
 	currentDepth int
-	currentFrame *opsCallFrame
+	currentFrame *OpsCallFrame
 	interrupt    uint32 // Atomic flag to signal execution interruption
 	reason       error  // Textual reason for the interruption
 	initialized  bool
@@ -88,7 +87,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	if t.initialized {
 		return
 	}
-	t.callstack = opsCallFrame{
+	t.callstack = OpsCallFrame{
 		Type:  "CALL",
 		From:  addrToHex(from),
 		To:    addrToHex(to),
@@ -178,7 +177,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		if op != vm.LOG0 && topic0 == "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" {
 			label = LabelTransfer
 		}
-		frame := opsCallFrame{
+		frame := OpsCallFrame{
 			Type:    op.String(),
 			Label:   label,
 			From:    scope.Contract.Address().String(),
@@ -196,7 +195,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 	case vm.CREATE, vm.CREATE2:
 		value := scope.Stack.Back(0)
 		from := scope.Contract.Address()
-		frame := opsCallFrame{
+		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    from.String(),
 			GasIn:   uintToHex(gas),
@@ -222,7 +221,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 	case vm.SELFDESTRUCT:
 		// TODO: capture in `CaptureSelfDestruct`?
 		value := env.IntraBlockState().GetBalance(scope.Contract.Address())
-		frame := opsCallFrame{
+		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    scope.Contract.Address().String(),
 			To:      scope.Stack.Back(0).String(),
@@ -242,7 +241,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			return
 		}
 		value := scope.Stack.Back(2)
-		frame := opsCallFrame{
+		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    scope.Contract.Address().String(),
 			To:      to.String(),
@@ -263,7 +262,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		if t.isPrecompiled(env, to) {
 			return
 		}
-		frame := opsCallFrame{
+		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    scope.Contract.Address().String(),
 			To:      to.String(),
@@ -304,6 +303,10 @@ func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 		return nil, err
 	}
 	return json.RawMessage(res), t.reason
+}
+
+func (t *OpsTracer) GetCallStack() *OpsCallFrame {
+	return &t.callstack
 }
 
 func addrToHex(a common.Address) string {

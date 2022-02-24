@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
@@ -13,7 +14,7 @@ import (
 func main() {
 	cmd, cfg := cli.RootCommand()
 	rootCtx, rootCancel := common.RootContext()
-	cmd.AddCommand(commands.ExportCmd(cfg, rootCancel))
+	cmd.AddCommand(commands.GetExportCmd(cfg, rootCancel))
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		logger := log.New()
 		db, backend, txPool, mining, stateCache, err := cli.RemoteServices(cmd.Context(), *cfg, logger, rootCancel)

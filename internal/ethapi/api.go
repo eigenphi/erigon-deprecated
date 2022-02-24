@@ -315,35 +315,6 @@ func RPCMarshalBlock(block *types.Block, inclTx bool, fullTx bool) (map[string]i
 	return fields, nil
 }
 
-func FullBlock(block *types.Block) (map[string]interface{}, error) {
-	fields := RPCMarshalHeader(block.Header())
-	fields["size"] = hexutil.Uint64(block.Size())
-
-	formatTx := func(tx types.Transaction) (interface{}, error) {
-		return tx.Hash(), nil
-	}
-	formatTx = func(tx types.Transaction) (interface{}, error) {
-		return newRPCTransactionFromBlockHash(block, tx.Hash()), nil
-	}
-	txs := block.Transactions()
-	transactions := make([]interface{}, len(txs))
-	var err error
-	for i, tx := range txs {
-		if transactions[i], err = formatTx(tx); err != nil {
-			return nil, err
-		}
-	}
-	fields["transactions"] = transactions
-	uncles := block.Uncles()
-	uncleHashes := make([]common.Hash, len(uncles))
-	for i, uncle := range uncles {
-		uncleHashes[i] = uncle.Hash()
-	}
-	fields["uncles"] = uncleHashes
-
-	return fields, nil
-}
-
 /*
 
 // rpcMarshalHeader uses the generalized output filler, then adds the total difficulty field, which requires
