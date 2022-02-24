@@ -36,20 +36,21 @@ const (
 )
 
 type OpsCallFrame struct {
-	Type    string           `json:"type"`
-	Label   string           `json:"label"`
-	From    string           `json:"from"`
-	To      string           `json:"to,omitempty"`
-	Value   string           `json:"value,omitempty"`
-	GasIn   string           `json:"gasIn"`
-	GasCost string           `json:"gasCost"`
-	Input   string           `json:"input,omitempty"`
-	Error   string           `json:"error,omitempty"`
-	Calls   []*OpsCallFrame  `json:"calls,omitempty"`
-	parent  *OpsCallFrame    `json:"-"`
-	scope   *vm.ScopeContext `json:"-"`
-	code    []byte           `json:"-"` // for calculating CREATE2 contract address
-	salt    *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
+	Type            string           `json:"type"`
+	Label           string           `json:"label"`
+	From            string           `json:"from"`
+	To              string           `json:"to,omitempty"`
+	ContractCreated string           `json:"contract_created,omitempty"`
+	Value           string           `json:"value,omitempty"`
+	GasIn           string           `json:"gasIn"`
+	GasCost         string           `json:"gasCost"`
+	Input           string           `json:"input,omitempty"`
+	Error           string           `json:"error,omitempty"`
+	Calls           []*OpsCallFrame  `json:"calls,omitempty"`
+	parent          *OpsCallFrame    `json:"-"`
+	scope           *vm.ScopeContext `json:"-"`
+	code            []byte           `json:"-"` // for calculating CREATE2 contract address
+	salt            *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
 }
 
 type OpsTracer struct {
@@ -296,7 +297,7 @@ func (t *OpsTracer) CaptureAccountWrite(account common.Address) error {
 // error arising from the encoding or forceful termination (via `Stop`).
 func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 	if len(t.callstack.Error) != 0 {
-		t.callstack.Calls = []*opsCallFrame{}
+		t.callstack.Calls = []*OpsCallFrame{}
 	}
 	res, err := json.Marshal(t.callstack)
 	if err != nil {
