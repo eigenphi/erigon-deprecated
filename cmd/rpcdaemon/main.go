@@ -1,6 +1,7 @@
 package main
 
 import (
+	"go.uber.org/zap"
 	"os"
 
 	"github.com/ledgerwatch/erigon-lib/common"
@@ -9,6 +10,14 @@ import (
 	"github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	log, err := zap.NewDevelopment(zap.AddStacktrace(zap.PanicLevel))
+	if err != nil {
+		panic(err)
+	}
+	zap.ReplaceGlobals(log)
+}
 
 func main() {
 	cmd, cfg := cli.RootCommand()
