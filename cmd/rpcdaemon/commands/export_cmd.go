@@ -144,7 +144,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 				}
 				defer trace.Stop()
 			}
-		
+
 			logger := v3log.New()
 
 			var startBlock, endBlock rpc.BlockNumber
@@ -203,7 +203,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			tracerName := "opsTracer"
 			ctx = context.WithValue(ctx, "logger", logger)
 			for height := startBlock; height <= endBlock; height++ {
-				if err := debugImpl.TraceSingleBlock(ctx, startBlock, &tracers.TraceConfig{
+				if err := debugImpl.TraceSingleBlock(ctx, height, &tracers.TraceConfig{
 					Tracer: &tracerName,
 				}, file, outProtobuf); err != nil {
 					zlog.Errorf("could not trace block: %s", err)
