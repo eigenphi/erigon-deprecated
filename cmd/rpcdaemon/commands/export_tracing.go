@@ -111,7 +111,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
 		if err != nil {
 			// TODO handle trace transaction error
-			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s", err)
+			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)
 		}
 
 		var baseFee *big.Int
@@ -158,6 +158,9 @@ func toPbTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCa
 }
 
 func toPbCallTrace(in *native.OpsCallFrame) *protobuf.StackFrame {
+	if in == nil {
+		return &protobuf.StackFrame{}
+	}
 
 	var calls []*protobuf.StackFrame
 	if in.Calls != nil {
