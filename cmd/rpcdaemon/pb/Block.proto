@@ -14,11 +14,9 @@ message  stackFrame {
   string to = 4;
   string contractCreated = 5;
   string value = 6;
-  //  string gasIn = 6;
-  //  string gasUsed = 7;
-  string input = 8;
-  string error = 9;
-  repeated stackFrame calls = 10;
+  string input = 7;
+  string error = 8;
+  repeated stackFrame calls = 9;
 }
 
 message InternalTxn {
@@ -61,7 +59,30 @@ message  Receipt {
   string senderInfo = 12;
 }
 
+
 message Transaction{
+  string transactionHash = 1;
+  int32 transactionIndex = 2;
+  int64  blockNumber = 3;
+  string fromAddress = 4;
+  string toAddress = 5;
+  int64 nonce = 6;
+  string transactionValue = 7;
+  int64 blockTimestamp = 8;
+}
+
+message Block {
+  int64 blockNumber = 2;
+  string blockHash = 3;
+  string parentHash = 4;
+  string miner = 6;
+  int32 blockSize = 7;
+  int64  gasLimit = 8;
+  int64  gasUsed = 9;
+  int64 blockTimestamp = 10;
+}
+
+message TraceTransaction{
   int64  blockNumber = 1;
   string transactionHash = 2;
   int32 transactionIndex = 3;
@@ -72,20 +93,4 @@ message Transaction{
   int64 nonce = 8;
   string transactionValue = 9;
   stackFrame stack = 10;
-}
-
-message Block {
-  string chain = 1;
-  int64 blockNumber = 2;
-  string blockHash = 3;
-  string parentHash = 4;
-  string nonce = 5;
-  string miner = 6;
-  int32 blockSize = 7;
-  int64  gasLimit = 8;
-  int64  gasUsed = 9;
-  int64 blockTimestamp = 10;
-  int32 transactionCount = 11;
-  repeated Transaction transactions = 12;
-  string senderInfo = 13;
 }
