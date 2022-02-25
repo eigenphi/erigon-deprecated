@@ -220,12 +220,12 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		t.currentDepth += 1
 		return
 	case vm.SELFDESTRUCT:
-		// TODO: capture in `CaptureSelfDestruct`?
 		value := env.IntraBlockState().GetBalance(scope.Contract.Address())
+		var to common.Address = scope.Stack.Back(0).Bytes20()
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    strings.ToLower(scope.Contract.Address().String()),
-			To:      strings.ToLower(scope.Stack.Back(0).String()),
+			To:      strings.ToLower(to.String()),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
@@ -299,6 +299,10 @@ func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 	if len(t.callstack.Error) != 0 {
 		t.callstack.Calls = []*OpsCallFrame{}
 	}
+	if t.reason != nil {
+		t.callstack.Error = t.reason.Error()
+		t.callstack.Calls = []*OpsCallFrame{}
+	}
 	res, err := json.Marshal(t.callstack)
 	if err != nil {
 		return nil, err
@@ -308,6 +312,10 @@ func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 
 func (t *OpsTracer) GetCallStack() *OpsCallFrame {
 	if len(t.callstack.Error) != 0 {
+		t.callstack.Calls = []*OpsCallFrame{}
+	}
+	if t.reason != nil {
+		t.callstack.Error = t.reason.Error()
 		t.callstack.Calls = []*OpsCallFrame{}
 	}
 	return &t.callstack
