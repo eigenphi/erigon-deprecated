@@ -2,8 +2,8 @@ package commands
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/golang/protobuf/jsonpb"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
 	"github.com/ledgerwatch/erigon/common"
@@ -20,7 +20,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"math/big"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -64,6 +63,63 @@ type TxOpsTracer struct {
 	trace native.OpsCallFrame
 }
 
+func (api *PrivateDebugAPIImpl) getSimpleBlock(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
+	tx, err := api.db.BeginRo(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var block *types.Block
+	block, err = api.blockByRPCNumber(blockNr, tx)
+	if err != nil {
+		return err
+	}
+	simpleBlock := toPbSimpleBlock(block)
+
+	out := jsonpb.Marshaler{EmitDefaults: true}
+	if err := out.Marshal(output, &simpleBlock); err != nil {
+		return fmt.Errorf("failed to marshal block: %s", err)
+	}
+
+	if _, err := output.WriteString("\n"); err != nil {
+		return fmt.Errorf("failed to write newline: %s", err)
+	}
+	return nil
+}
+
+func (api *PrivateDebugAPIImpl) getSimpleTx(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
+	tx, err := api.db.BeginRo(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var block *types.Block
+	block, err = api.blockByRPCNumber(blockNr, tx)
+	if err != nil {
+		return err
+	}
+
+	out := jsonpb.Marshaler{EmitDefaults: true}
+	for idx, tx := range block.Transactions() {
+		select {
+		default:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+
+		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), big.NewInt(0))
+		pbTx := toPbSimpleTransaction(rtx, tx, block.Time())
+		if err := out.Marshal(output, &pbTx); err != nil {
+			return fmt.Errorf("failed to encode transaction: %s", err)
+		}
+
+		if _, err := output.WriteString("\n"); err != nil {
+			return fmt.Errorf("failed to write newline: %s", err)
+		}
+	}
+	return nil
+}
+
 func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rpc.BlockNumber, config *tracers.TraceConfig, output *os.File, outProto bool) error {
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
@@ -97,7 +153,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 
 	signer := types.MakeSigner(chainConfig, block.NumberU64())
 
-	out := json.NewEncoder(output)
+	out := jsonpb.Marshaler{EmitDefaults: true}
 	for idx, tx := range block.Transactions() {
 		select {
 		default:
@@ -119,7 +175,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 			baseFee = block.BaseFee()
 		}
 		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
-		pbTx := toPbTransaction(rtx, tx, tracerResult)
+		pbTx := toPbTraceTransaction(rtx, tx, tracerResult)
 		if outProto {
 			marshal, err := proto.Marshal(&pbTx)
 			if err != nil {
@@ -129,24 +185,55 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 				return fmt.Errorf("write protobuf data: %s", err)
 			}
 		} else {
-			if err := out.Encode(&pbTx); err != nil {
+			if err := out.Marshal(output, &pbTx); err != nil {
 				return fmt.Errorf("failed to encode transaction: %s", err)
+			}
+			if _, err := output.WriteString("\n"); err != nil {
+				return fmt.Errorf("failed to write newline: %s", err)
 			}
 		}
 	}
 	return nil
 }
 
-func toPbTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCallFrame) protobuf.Transaction {
-	txIdx, _ := strconv.ParseInt(rtx.TransactionIndex.String(), 10, 64)
+func toPbSimpleBlock(block *types.Block) protobuf.Block {
+	return protobuf.Block{
+		BlockNumber:    int64(block.NumberU64()),
+		BlockHash:      block.Hash().String(),
+		ParentHash:     block.ParentHash().String(),
+		Miner:          block.Header().Coinbase.String(),
+		BlockSize:      int32(block.Size()),
+		GasLimit:       int64(block.GasLimit()),
+		GasUsed:        int64(block.GasUsed()),
+		BlockTimestamp: int64(block.Time()),
+	}
+}
+func toPbSimpleTransaction(rtx *RPCTransaction, tx types.Transaction, blkTs uint64) protobuf.Transaction {
 	var to string
 	if rtx.To != nil {
 		to = strings.ToLower(rtx.To.String())
 	}
 	return protobuf.Transaction{
+		TransactionHash:  rtx.Hash.String(),
+		TransactionIndex: int32(*rtx.TransactionIndex),
+		BlockNumber:      rtx.BlockNumber.ToInt().Int64(),
+		FromAddress:      strings.ToLower(rtx.From.String()),
+		ToAddress:        to,
+		Nonce:            int64(tx.GetNonce()),
+		TransactionValue: tx.GetValue().String(),
+		BlockTimestamp:   int64(blkTs),
+	}
+}
+
+func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCallFrame) protobuf.TraceTransaction {
+	var to string
+	if rtx.To != nil {
+		to = strings.ToLower(rtx.To.String())
+	}
+	return protobuf.TraceTransaction{
 		BlockNumber:      rtx.BlockNumber.ToInt().Int64(),
 		TransactionHash:  rtx.Hash.String(),
-		TransactionIndex: int32(txIdx),
+		TransactionIndex: int32(*rtx.TransactionIndex),
 		FromAddress:      strings.ToLower(rtx.From.String()),
 		ToAddress:        to,
 		GasPrice:         rtx.GasPrice.ToInt().Int64(),
