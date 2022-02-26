@@ -17,44 +17,107 @@ import (
 	"github.com/ledgerwatch/erigon/rpc"
 	"github.com/ledgerwatch/erigon/turbo/transactions"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
+	"io"
 	"math/big"
 	"os"
 	"strings"
 )
 
-//// TraceBlockByStep implements debug_traceBlockByStep. Returns Geth style blocks traces with startNumber and step size.
-//func (api *PrivateDebugAPIImpl) TraceBlockByStep(ctx context.Context, startBlock, step rpc.BlockNumber, config *tracers.TraceConfig, stream *jsoniter.Stream) error {
-//	// TODO check endBlock less than latest height
-//	if step <= 0 {
-//		return fmt.Errorf("step must be positive")
-//	}
-//
-//	for block := startBlock; block <= startBlock+step; block++ {
-//		err := api.TraceSingleBlock(ctx, block, config, stream)
-//		if err != nil {
-//			stream.Write(nil)
-//			return err
-//		}
-//	}
-//	return nil
-//}
-//
-// TraceBlockByRange implements debug_traceBlockByRange. Returns Geth style blocks traces with startNumber and endNumber.
-func (api *PrivateDebugAPIImpl) TraceBlockByRange(ctx context.Context, startBlockNumber, endBlockNumber rpc.BlockNumber, config *tracers.TraceConfig, stream *jsoniter.Stream) error {
-	if startBlockNumber >= endBlockNumber {
-		return fmt.Errorf("startBlock >= endBlock")
+var _ PrivateDebugAPI = (*PrivateDebugAPIImpl)(nil)
+
+func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash common.Hash, stream *jsoniter.Stream) error {
+	defer stream.Flush()
+
+	tx, err := api.db.BeginRo(ctx)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+	defer tx.Rollback()
+	// Retrieve the transaction and assemble its EVM context
+	blockNum, ok, err := api.txnLookup(ctx, tx, hash)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	block, err := api.blockByNumberWithSenders(tx, blockNum)
+	if err != nil {
+		return err
+	}
+	if block == nil {
+		return nil
+	}
+	blockHash := block.Hash()
+	var txnIndex uint64
+	var txn types.Transaction
+	for i, transaction := range block.Transactions() {
+		if transaction.Hash() == hash {
+			txnIndex = uint64(i)
+			txn = transaction
+			break
+		}
+	}
+	if txn == nil {
+		var borTx *types.Transaction
+		borTx, _, _, _, err = rawdb.ReadBorTransaction(tx, hash)
+
+		if err != nil {
+			return err
+		}
+
+		if borTx != nil {
+			return nil
+		}
+		stream.WriteNil()
+		return fmt.Errorf("transaction %#x not found", hash)
+	}
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		stream.WriteNil()
+		return err
 	}
 
-	// TODO check endBlock less or equal than latest height
+	getHeader := func(hash common.Hash, number uint64) *types.Header {
+		return rawdb.ReadHeader(tx, hash, number)
+	}
+	contractHasTEVM := func(contractHash common.Hash) (bool, error) { return false, nil }
+	if api.TevmEnabled {
+		contractHasTEVM = ethdb.GetHasTEVM(tx)
+	}
+	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, contractHasTEVM, ethash.NewFaker(), tx, blockHash, txnIndex)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+	// Trace the transaction and return
+	config := &tracers.TraceConfig{}
+	tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+	out := jsonpb.Marshaler{EmitDefaults: true}
+	pbTrace := toPbCallTrace(tracerResult)
+	if err := out.Marshal(stream, pbTrace); err != nil {
+		return fmt.Errorf("proto marshal %s", err)
+	}
+	return nil
+}
 
-	//for block := startBlockNumber; block <= endBlockNumber; block++ {
-	//	err := api.TraceSingleBlock(ctx, block, config, stream)
-	//	if err != nil {
-	//		stream.Write(nil)
-	//		return err
-	//	}
-	//}
+func (api *PrivateDebugAPIImpl) EigenphiTraceByHeight(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error {
+	defer stream.Flush()
+
+	config := &tracers.TraceConfig{}
+	if _, err := stream.Write([]byte("[")); err != nil {
+		return fmt.Errorf("write array begin err: %s", err)
+	}
+	if err := api.TraceSingleBlock(ctx, height, config, stream, []byte(",")); err != nil {
+		stream.WriteNil()
+		return err
+	}
+	stream.Write([]byte("]"))
 	return nil
 }
 
@@ -120,7 +183,7 @@ func (api *PrivateDebugAPIImpl) getSimpleTx(ctx context.Context, blockNr rpc.Blo
 	return nil
 }
 
-func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rpc.BlockNumber, config *tracers.TraceConfig, output *os.File, outProto bool) error {
+func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rpc.BlockNumber, config *tracers.TraceConfig, output io.Writer, separator []byte) error {
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
 		return err
@@ -130,6 +193,9 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 	block, err = api.blockByRPCNumber(blockNr, tx)
 	if err != nil {
 		return err
+	}
+	if block == nil {
+		return fmt.Errorf("block %d not found", blockNr)
 	}
 
 	chainConfig, err := api.chainConfig(tx)
@@ -176,21 +242,11 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		}
 		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
 		pbTx := toPbTraceTransaction(rtx, tx, tracerResult)
-		if outProto {
-			marshal, err := proto.Marshal(&pbTx)
-			if err != nil {
-				return fmt.Errorf("proto marshal %s", err)
-			}
-			if _, err := output.Write(marshal); err != nil {
-				return fmt.Errorf("write protobuf data: %s", err)
-			}
-		} else {
-			if err := out.Marshal(output, &pbTx); err != nil {
-				return fmt.Errorf("failed to encode transaction: %s", err)
-			}
-			if _, err := output.WriteString("\n"); err != nil {
-				return fmt.Errorf("failed to write newline: %s", err)
-			}
+		if err := out.Marshal(output, &pbTx); err != nil {
+			return fmt.Errorf("failed to encode transaction: %s", err)
+		}
+		if _, err := output.Write(separator); err != nil {
+			return fmt.Errorf("failed to write newline: %s", err)
 		}
 	}
 	return nil

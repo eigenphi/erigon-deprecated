@@ -275,7 +275,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			for height := startBlock; height <= endBlock; height++ {
 				if err := debugImpl.TraceSingleBlock(ctx, height, &tracers.TraceConfig{
 					Tracer: &tracerName,
-				}, file, outProtobuf); err != nil {
+				}, file, []byte("\n")); err != nil {
 					zlog.Errorf("could not trace block: %s", err)
 
 				} else {
