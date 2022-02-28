@@ -36,7 +36,7 @@ type PrivateDebugAPI interface {
 	TraceCall(ctx context.Context, args ethapi.CallArgs, blockNrOrHash rpc.BlockNumberOrHash, config *tracers.TraceConfig, stream *jsoniter.Stream) error
 	AccountAt(ctx context.Context, blockHash common.Hash, txIndex uint64, account common.Address) (*AccountResult, error)
 	EigenphiTraceByTxHash(ctx context.Context, hash common.Hash, stream *jsoniter.Stream) error
-	EigenphiTraceByHeight(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error
+	EigenphiTraceByNumber(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error
 }
 
 // PrivateDebugAPIImpl is implementation of the PrivateDebugAPI interface based on remote Db access

@@ -106,7 +106,7 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 	return nil
 }
 
-func (api *PrivateDebugAPIImpl) EigenphiTraceByHeight(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error {
+func (api *PrivateDebugAPIImpl) EigenphiTraceByNumber(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error {
 	defer stream.Flush()
 
 	config := &tracers.TraceConfig{}
@@ -245,8 +245,10 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		if err := out.Marshal(output, &pbTx); err != nil {
 			return fmt.Errorf("failed to encode transaction: %s", err)
 		}
-		if _, err := output.Write(separator); err != nil {
-			return fmt.Errorf("failed to write newline: %s", err)
+		if idx+1 != len(block.Transactions()) {
+			if _, err := output.Write(separator); err != nil {
+				return fmt.Errorf("failed to write newline: %s", err)
+			}
 		}
 	}
 	return nil
