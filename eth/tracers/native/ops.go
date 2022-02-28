@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon/crypto"
+	"github.com/ledgerwatch/erigon/utils/fourbyte"
 	"math/big"
 	"strconv"
 	"strings"
@@ -60,6 +61,8 @@ type OpsTracer struct {
 	interrupt    uint32 // Atomic flag to signal execution interruption
 	reason       error  // Textual reason for the interruption
 	initialized  bool
+
+	labelDb *fourbyte.Database
 }
 
 // newOpsTracer returns a native go tracer which tracks
@@ -67,7 +70,10 @@ type OpsTracer struct {
 func NewOpsTracer() vm.Tracer {
 	// First callframe contains tx context info
 	// and is populated on start and end.
-	return &OpsTracer{}
+	var labelDb, _ = fourbyte.New()
+	return &OpsTracer{
+		labelDb: labelDb,
+	}
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
@@ -140,6 +146,18 @@ func (t *OpsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 	return false
 }
 
+func (t *OpsTracer) getLabel(topic0 string) string {
+	//if op != vm.LOG0 {
+	topic0Bs, _ := hex.DecodeString(topic0)
+	label, _ := t.labelDb.Selector(topic0Bs)
+	//}
+	index := strings.Index(label, "(")
+	if index != -1 {
+		return label[:index]
+	}
+	return label
+}
+
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
 func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
 	//fmt.Println("CaptureState", depth, t.currentDepth, op.String())
@@ -173,11 +191,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			topic3 = scope.Stack.Back(5).String()[2:] // remove "0x" prefix
 			logInput = topic0 + topic1 + topic2 + topic3
 		}
-		var label string
-		// FIXME: add docs about the magic number
-		if op != vm.LOG0 && topic0 == "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" {
-			label = LabelTransfer
-		}
+		var label string = t.getLabel(topic0)
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			Label:   label,
