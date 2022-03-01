@@ -275,7 +275,6 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			return
 		}
 
-		value := scope.Stack.Back(2)
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    strings.ToLower(scope.Contract.Address().String()),
@@ -285,9 +284,6 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			parent:  t.currentFrame,
 		}
 
-		if !value.IsZero() {
-			frame.Label = LabelInternalTransfer
-		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 		t.currentFrame = &frame
 		t.currentDepth += 1
