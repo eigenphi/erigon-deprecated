@@ -61,8 +61,6 @@ type OpsTracer struct {
 	interrupt    uint32 // Atomic flag to signal execution interruption
 	reason       error  // Textual reason for the interruption
 	initialized  bool
-
-	labelDb *fourbyte.Database
 }
 
 // newOpsTracer returns a native go tracer which tracks
@@ -70,10 +68,13 @@ type OpsTracer struct {
 func NewOpsTracer() vm.Tracer {
 	// First callframe contains tx context info
 	// and is populated on start and end.
-	var labelDb, _ = fourbyte.New()
-	return &OpsTracer{
-		labelDb: labelDb,
-	}
+	return &OpsTracer{}
+}
+
+var labelDb *fourbyte.Database
+
+func init() {
+	labelDb, _ = fourbyte.New()
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
@@ -149,7 +150,7 @@ func (t *OpsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 func (t *OpsTracer) getLabel(topic0 string) string {
 	//if op != vm.LOG0 {
 	topic0Bs, _ := hex.DecodeString(topic0)
-	label, _ := t.labelDb.Selector(topic0Bs)
+	label, _ := labelDb.Selector(topic0Bs)
 	//}
 	return label
 }
@@ -273,6 +274,8 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		if t.isPrecompiled(env, to) {
 			return
 		}
+
+		value := scope.Stack.Back(2)
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    strings.ToLower(scope.Contract.Address().String()),
@@ -280,6 +283,10 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
+		}
+
+		if !value.IsZero() {
+			frame.Label = LabelInternalTransfer
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 		t.currentFrame = &frame
