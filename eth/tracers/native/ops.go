@@ -151,10 +151,6 @@ func (t *OpsTracer) getLabel(topic0 string) string {
 	topic0Bs, _ := hex.DecodeString(topic0)
 	label, _ := t.labelDb.Selector(topic0Bs)
 	//}
-	index := strings.Index(label, "(")
-	if index != -1 {
-		return label[:index]
-	}
 	return label
 }
 
