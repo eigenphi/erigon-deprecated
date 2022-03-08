@@ -175,18 +175,18 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		case vm.LOG2:
 			topic0 = scope.Stack.Back(2).String()[2:] // remove "0x" prefix
 			topic1 = scope.Stack.Back(3).String()[2:] // remove "0x" prefix
-			logInput = topic0 + topic1
+			logInput = strings.Join([]string{topic0, topic1}, " ")
 		case vm.LOG3:
 			topic0 = scope.Stack.Back(2).String()[2:] // remove "0x" prefix
 			topic1 = scope.Stack.Back(3).String()[2:] // remove "0x" prefix
 			topic2 = scope.Stack.Back(4).String()[2:] // remove "0x" prefix
-			logInput = topic0 + topic1 + topic2
+			logInput = strings.Join([]string{topic0, topic1, topic2}, " ")
 		case vm.LOG4:
 			topic0 = scope.Stack.Back(2).String()[2:] // remove "0x" prefix
 			topic1 = scope.Stack.Back(3).String()[2:] // remove "0x" prefix
 			topic2 = scope.Stack.Back(4).String()[2:] // remove "0x" prefix
 			topic3 = scope.Stack.Back(5).String()[2:] // remove "0x" prefix
-			logInput = topic0 + topic1 + topic2 + topic3
+			logInput = strings.Join([]string{topic0, topic1, topic2, topic3}, " ")
 		}
 		var label string = t.getLabel(topic0)
 		frame := OpsCallFrame{
