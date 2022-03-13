@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
-	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli/httpcfg"
 	"github.com/ledgerwatch/erigon/eth/tracers"
 	"github.com/ledgerwatch/erigon/rpc"
 	v3log "github.com/ledgerwatch/log/v3"
@@ -22,7 +21,7 @@ var ExportCmd = &cobra.Command{
 func init() {
 }
 
-func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Command {
+func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command {
 	var (
 		outJsonL    bool
 		outProtobuf bool
@@ -67,18 +66,15 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			}
 
 			ctx := cmd.Context()
-			db, borDb, eth, txPool, mining, _, stateCache, blockReader, filters, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, eth, txPool, mining, stateCache, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
 				os.Exit(1)
 			}
 			_, _, _ = eth, txPool, mining
 			defer db.Close()
-			if borDb != nil {
-				defer borDb.Close()
-			}
 
-			base := NewBaseApi(filters, stateCache, blockReader, cfg.SingleNodeMode)
+			base := NewBaseApi(nil, stateCache, cfg.SingleNodeMode)
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}
@@ -149,18 +145,15 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			}
 
 			ctx := cmd.Context()
-			db, borDb, eth, txPool, mining, _, stateCache, blockReader, filters, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, eth, txPool, mining, stateCache, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
 				os.Exit(1)
 			}
 			_, _, _ = eth, txPool, mining
 			defer db.Close()
-			if borDb != nil {
-				defer borDb.Close()
-			}
 
-			base := NewBaseApi(filters, stateCache, blockReader, cfg.SingleNodeMode)
+			base := NewBaseApi(nil, stateCache, cfg.SingleNodeMode)
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}
@@ -231,7 +224,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			}
 
 			ctx := cmd.Context()
-			db, borDb, eth, txPool, mining, _, stateCache, blockReader, filters, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, eth, txPool, mining, stateCache, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
 				os.Exit(1)
@@ -240,11 +233,8 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			_ = txPool
 			_ = mining
 			defer db.Close()
-			if borDb != nil {
-				defer borDb.Close()
-			}
 
-			base := NewBaseApi(filters, stateCache, blockReader, cfg.SingleNodeMode)
+			base := NewBaseApi(nil, stateCache, cfg.SingleNodeMode)
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}

@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"github.com/holiman/uint256"
+	"github.com/ledgerwatch/erigon/core/vm/stack"
 	"github.com/ledgerwatch/erigon/crypto"
 	"github.com/ledgerwatch/erigon/utils/fourbyte"
 	"math/big"
@@ -37,21 +38,20 @@ const (
 )
 
 type OpsCallFrame struct {
-	Type            string           `json:"type"`
-	Label           string           `json:"label"`
-	From            string           `json:"from"`
-	To              string           `json:"to,omitempty"`
-	ContractCreated string           `json:"contract_created,omitempty"`
-	Value           string           `json:"value,omitempty"`
-	GasIn           string           `json:"gasIn"`
-	GasCost         string           `json:"gasCost"`
-	Input           string           `json:"input,omitempty"`
-	Error           string           `json:"error,omitempty"`
-	Calls           []*OpsCallFrame  `json:"calls,omitempty"`
-	parent          *OpsCallFrame    `json:"-"`
-	scope           *vm.ScopeContext `json:"-"`
-	code            []byte           `json:"-"` // for calculating CREATE2 contract address
-	salt            *uint256.Int     `json:"-"` // for calculating CREATE2 contract address
+	Type            string          `json:"type"`
+	Label           string          `json:"label"`
+	From            string          `json:"from"`
+	To              string          `json:"to,omitempty"`
+	ContractCreated string          `json:"contract_created,omitempty"`
+	Value           string          `json:"value,omitempty"`
+	GasIn           string          `json:"gasIn"`
+	GasCost         string          `json:"gasCost"`
+	Input           string          `json:"input,omitempty"`
+	Error           string          `json:"error,omitempty"`
+	Calls           []*OpsCallFrame `json:"calls,omitempty"`
+	parent          *OpsCallFrame   `json:"-"`
+	code            []byte          `json:"-"` // for calculating CREATE2 contract address
+	salt            *uint256.Int    `json:"-"` // for calculating CREATE2 contract address
 }
 
 type OpsTracer struct {
@@ -78,9 +78,9 @@ func init() {
 }
 
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
-func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address,
+func (t *OpsTracer) CaptureStart(depth int, from, to common.Address,
 	precompile, create bool, callType vm.CallType, input []byte, gas uint64,
-	value *big.Int, code []byte) {
+	value *big.Int, code []byte) error {
 
 	//fmt.Println("CaptureStart", depth, callType)
 	if callType == vm.CREATE2T {
@@ -93,7 +93,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 		create2Frame.ContractCreated = contractAddr.String()
 	}
 	if t.initialized {
-		return
+		return nil
 	}
 	t.callstack = OpsCallFrame{
 		Type:  "CALL",
@@ -108,14 +108,16 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from, to common.Address
 	t.currentDepth = depth + 1 // depth is the value before "CALL" or "CREATE"
 	t.currentFrame = &t.callstack
 	t.initialized = true
+	return nil
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
-func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
+func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64,
+	duration time.Duration, err error) error {
 	//fmt.Println("CaptureEnd", depth, t.currentDepth, err)
 	// precompiled calls don't have a callframe
 	if depth == t.currentDepth {
-		return
+		return nil
 	}
 	t.currentFrame.GasCost = uintToHex(startGas - endGas)
 	if err != nil {
@@ -124,21 +126,22 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 
 	t.currentFrame = t.currentFrame.parent
 	t.currentDepth -= 1
+	return nil
 }
 
 // Note the result has no "0x" prefix
-func getLogValueHex(scope *vm.ScopeContext) string {
-	offset := scope.Stack.Back(0).Uint64()
-	length := scope.Stack.Back(1).Uint64()
-	if scope.Memory.Len() < int(offset+length) {
-		scope.Memory.Resize(offset + length)
+func getLogValueHex(stack *stack.Stack, memory *vm.Memory) string {
+	offset := stack.Back(0).Uint64()
+	length := stack.Back(1).Uint64()
+	if memory.Len() < int(offset+length) {
+		memory.Resize(offset + length)
 	}
-	return hex.EncodeToString(scope.Memory.Data()[offset : offset+length])
+	return hex.EncodeToString(memory.Data()[offset : offset+length])
 }
 
 // code modified from `4byte.go`
 func (t *OpsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
-	activePrecompiles := vm.ActivePrecompiles(env.ChainRules())
+	activePrecompiles := vm.ActivePrecompiles(env.ChainRules)
 	for _, p := range activePrecompiles {
 		if p == addr {
 			return true
@@ -156,57 +159,58 @@ func (t *OpsTracer) getLabel(topic0 string) string {
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
-func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
+func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory,
+	stack *stack.Stack, rData []byte, contract *vm.Contract, depth int, err error) error {
 	//fmt.Println("CaptureState", depth, t.currentDepth, op.String())
 	if err != nil {
 		t.reason = err
 		if t.currentFrame != nil {
 			t.currentFrame.Error = err.Error()
 		}
-		return
+		return nil
 	}
 
 	if op == vm.LOG0 || op == vm.LOG1 || op == vm.LOG2 || op == vm.LOG3 || op == vm.LOG4 {
 		var topic0, topic1, topic2, topic3, logInput string
 		switch op {
 		case vm.LOG1:
-			topic0 = scope.Stack.Back(2).String()[2:] // remove "0x" prefix
+			topic0 = stack.Back(2).String()[2:] // remove "0x" prefix
 			logInput = topic0
 		case vm.LOG2:
-			topic0 = scope.Stack.Back(2).String()[2:] // remove "0x" prefix
-			topic1 = scope.Stack.Back(3).String()[2:] // remove "0x" prefix
+			topic0 = stack.Back(2).String()[2:] // remove "0x" prefix
+			topic1 = stack.Back(3).String()[2:] // remove "0x" prefix
 			logInput = strings.Join([]string{topic0, topic1}, " ")
 		case vm.LOG3:
-			topic0 = scope.Stack.Back(2).String()[2:] // remove "0x" prefix
-			topic1 = scope.Stack.Back(3).String()[2:] // remove "0x" prefix
-			topic2 = scope.Stack.Back(4).String()[2:] // remove "0x" prefix
+			topic0 = stack.Back(2).String()[2:] // remove "0x" prefix
+			topic1 = stack.Back(3).String()[2:] // remove "0x" prefix
+			topic2 = stack.Back(4).String()[2:] // remove "0x" prefix
 			logInput = strings.Join([]string{topic0, topic1, topic2}, " ")
 		case vm.LOG4:
-			topic0 = scope.Stack.Back(2).String()[2:] // remove "0x" prefix
-			topic1 = scope.Stack.Back(3).String()[2:] // remove "0x" prefix
-			topic2 = scope.Stack.Back(4).String()[2:] // remove "0x" prefix
-			topic3 = scope.Stack.Back(5).String()[2:] // remove "0x" prefix
+			topic0 = stack.Back(2).String()[2:] // remove "0x" prefix
+			topic1 = stack.Back(3).String()[2:] // remove "0x" prefix
+			topic2 = stack.Back(4).String()[2:] // remove "0x" prefix
+			topic3 = stack.Back(5).String()[2:] // remove "0x" prefix
 			logInput = strings.Join([]string{topic0, topic1, topic2, topic3}, " ")
 		}
 		var label string = t.getLabel(topic0)
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			Label:   label,
-			From:    strings.ToLower(scope.Contract.Address().String()),
+			From:    strings.ToLower(contract.Address().String()),
 			Input:   logInput,
-			Value:   getLogValueHex(scope),
+			Value:   getLogValueHex(stack, memory),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
-		return
+		return nil
 	}
 
 	switch op {
 	case vm.CREATE, vm.CREATE2:
-		value := scope.Stack.Back(0)
-		from := scope.Contract.Address()
+		value := stack.Back(0)
+		from := contract.Address()
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    strings.ToLower(from.String()),
@@ -214,14 +218,13 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
 			parent:  t.currentFrame,
-			scope:   scope,
 		}
 		if op == vm.CREATE {
-			nonce := env.IntraBlockState().GetNonce(from)
+			nonce := env.IntraBlockState.GetNonce(from)
 			frame.ContractCreated = crypto.CreateAddress(from, nonce).String()
 		}
 		if op == vm.CREATE2 {
-			frame.salt = scope.Stack.Back(3)
+			frame.salt = stack.Back(3)
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
@@ -229,13 +232,12 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 		t.currentFrame = &frame
 		t.currentDepth += 1
-		return
 	case vm.SELFDESTRUCT:
-		value := env.IntraBlockState().GetBalance(scope.Contract.Address())
-		var to common.Address = scope.Stack.Back(0).Bytes20()
+		value := env.IntraBlockState.GetBalance(contract.Address())
+		var to common.Address = stack.Back(0).Bytes20()
 		frame := OpsCallFrame{
 			Type:    op.String(),
-			From:    strings.ToLower(scope.Contract.Address().String()),
+			From:    strings.ToLower(contract.Address().String()),
 			To:      strings.ToLower(to.String()),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
@@ -246,16 +248,15 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			frame.Label = LabelInternalTransfer
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
-		return
 	case vm.CALL, vm.CALLCODE:
-		var to common.Address = scope.Stack.Back(1).Bytes20()
+		var to common.Address = stack.Back(1).Bytes20()
 		if t.isPrecompiled(env, to) {
-			return
+			return nil
 		}
-		value := scope.Stack.Back(2)
+		value := stack.Back(2)
 		frame := OpsCallFrame{
 			Type:    op.String(),
-			From:    strings.ToLower(scope.Contract.Address().String()),
+			From:    strings.ToLower(contract.Address().String()),
 			To:      strings.ToLower(to.String()),
 			Value:   value.String(),
 			GasIn:   uintToHex(gas),
@@ -268,16 +269,15 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 		t.currentFrame = &frame
 		t.currentDepth += 1
-		return
 	case vm.DELEGATECALL, vm.STATICCALL:
-		var to common.Address = scope.Stack.Back(1).Bytes20()
+		var to common.Address = stack.Back(1).Bytes20()
 		if t.isPrecompiled(env, to) {
-			return
+			return nil
 		}
 
 		frame := OpsCallFrame{
 			Type:    op.String(),
-			From:    strings.ToLower(scope.Contract.Address().String()),
+			From:    strings.ToLower(contract.Address().String()),
 			To:      strings.ToLower(to.String()),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
@@ -287,14 +287,15 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 		t.currentFrame = &frame
 		t.currentDepth += 1
-		return
 	}
+	return nil
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.
 func (t *OpsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64,
-	scope *vm.ScopeContext, depth int, err error) {
+	memory *vm.Memory, stack *stack.Stack, contract *vm.Contract, depth int, err error) error {
 	//fmt.Println("CaptureFault", pc, op, gas, cost, depth, err)
+	return nil
 }
 
 func (t *OpsTracer) CaptureSelfDestruct(from common.Address, to common.Address, value *big.Int) {

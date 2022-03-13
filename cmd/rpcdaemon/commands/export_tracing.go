@@ -26,8 +26,6 @@ import (
 var _ PrivateDebugAPI = (*PrivateDebugAPIImpl)(nil)
 
 func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash common.Hash, stream *jsoniter.Stream) error {
-	defer stream.Flush()
-
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
 		stream.WriteNil()
@@ -35,50 +33,28 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 	}
 	defer tx.Rollback()
 	// Retrieve the transaction and assemble its EVM context
-	blockNum, ok, err := api.txnLookup(ctx, tx, hash)
+	txn, blockHash, _, txIndex, err := rawdb.ReadTransaction(tx, hash)
 	if err != nil {
 		return err
-	}
-	if !ok {
-		return nil
-	}
-	block, err := api.blockByNumberWithSenders(tx, blockNum)
-	if err != nil {
-		return err
-	}
-	if block == nil {
-		return nil
-	}
-	blockHash := block.Hash()
-	var txnIndex uint64
-	var txn types.Transaction
-	for i, transaction := range block.Transactions() {
-		if transaction.Hash() == hash {
-			txnIndex = uint64(i)
-			txn = transaction
-			break
-		}
 	}
 	if txn == nil {
-		var borTx *types.Transaction
-		borTx, _, _, _, err = rawdb.ReadBorTransaction(tx, hash)
-
-		if err != nil {
-			return err
-		}
-
-		if borTx != nil {
-			return nil
-		}
 		stream.WriteNil()
 		return fmt.Errorf("transaction %#x not found", hash)
 	}
+
 	chainConfig, err := api.chainConfig(tx)
 	if err != nil {
 		stream.WriteNil()
 		return err
 	}
 
+	block, err := api.blockByHashWithSenders(tx, blockHash)
+	if err != nil {
+		return err
+	}
+	if block == nil {
+		return nil
+	}
 	getHeader := func(hash common.Hash, number uint64) *types.Header {
 		return rawdb.ReadHeader(tx, hash, number)
 	}
@@ -86,7 +62,7 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 	if api.TevmEnabled {
 		contractHasTEVM = ethdb.GetHasTEVM(tx)
 	}
-	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, contractHasTEVM, ethash.NewFaker(), tx, blockHash, txnIndex)
+	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, contractHasTEVM, ethash.NewFaker(), tx, blockHash, txIndex)
 	if err != nil {
 		stream.WriteNil()
 		return err

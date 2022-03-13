@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/commands"
+	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/filters"
+	"github.com/ledgerwatch/erigon/cmd/utils"
 	"github.com/ledgerwatch/erigon/params"
+	"github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"os"
@@ -21,7 +23,7 @@ func init() {
 
 func main() {
 	cmd, cfg := cli.RootCommand()
-	rootCtx, rootCancel := common.RootContext()
+	rootCtx, rootCancel := utils.RootContext()
 	cmd.AddCommand(commands.GetExportCmd(cfg, rootCancel))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",

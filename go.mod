@@ -37,6 +37,7 @@ require (
 	github.com/ledgerwatch/erigon-lib v0.0.0-20220224065624-2b634b692f2b
 	github.com/ledgerwatch/log/v3 v3.4.0
 	github.com/ledgerwatch/secp256k1 v1.0.0
+	github.com/logrusorgru/aurora/v3 v3.0.0 // indirect
 	github.com/pelletier/go-toml v1.9.4
 	github.com/quasilyte/go-ruleguard/dsl v0.3.15
 	github.com/rs/cors v1.8.2
