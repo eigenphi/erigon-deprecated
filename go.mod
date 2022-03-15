@@ -13,12 +13,12 @@ require (
 	github.com/consensys/gnark-crypto v0.4.1-0.20210426202927-39ac3d4b3f1f
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.8.0
+	github.com/docker/docker v20.10.13+incompatible
 	github.com/dop251/goja v0.0.0-20211011172007-d99e4b8cbf48
 	github.com/edsrzf/mmap-go v1.0.0
 	github.com/emicklei/dot v0.16.0
 	github.com/fatih/color v1.12.0
 	github.com/fjl/gencodec v0.0.0-20191126094850-e283372f291f
-	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/goccy/go-json v0.7.4
 	github.com/gofrs/flock v0.8.1
 	github.com/golang/protobuf v1.5.2
@@ -37,7 +37,7 @@ require (
 	github.com/ledgerwatch/erigon-lib v0.0.0-20220224065624-2b634b692f2b
 	github.com/ledgerwatch/log/v3 v3.4.0
 	github.com/ledgerwatch/secp256k1 v1.0.0
-	github.com/logrusorgru/aurora/v3 v3.0.0 // indirect
+	github.com/logrusorgru/aurora/v3 v3.0.0
 	github.com/pelletier/go-toml v1.9.4
 	github.com/quasilyte/go-ruleguard/dsl v0.3.15
 	github.com/rs/cors v1.8.2
@@ -63,6 +63,6 @@ require (
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20200619000410-60c24ae608a6
-	gotest.tools v2.2.0+incompatible // indirect
+	gotest.tools/v3 v3.1.0 // indirect
 	pgregory.net/rapid v0.4.7
 )
