@@ -48,6 +48,7 @@ type OpsCallFrame struct {
 	Input           string           `json:"input,omitempty"`
 	Error           string           `json:"error,omitempty"`
 	Calls           []*OpsCallFrame  `json:"calls,omitempty"`
+	Origin          string           `json:"origin"`
 	parent          *OpsCallFrame    `json:"-"`
 	scope           *vm.ScopeContext `json:"-"`
 	code            []byte           `json:"-"` // for calculating CREATE2 contract address
@@ -204,6 +205,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			Value:   getLogValueHex(scope),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
+			Origin:  env.TxContext().Origin.String(),
 			parent:  t.currentFrame,
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
@@ -222,6 +224,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			Value:   value.String(),
 			parent:  t.currentFrame,
 			scope:   scope,
+			Origin:  env.TxContext().Origin.String(),
 		}
 		if op == vm.CREATE {
 			nonce := env.IntraBlockState().GetNonce(from)
@@ -248,6 +251,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
 			parent:  t.currentFrame,
+			Origin:  env.TxContext().Origin.String(),
 		}
 		if value.Uint64() != 0 {
 			frame.Label = LabelInternalTransfer
@@ -271,6 +275,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
+			Origin:  env.TxContext().Origin.String(),
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
@@ -292,6 +297,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
+			Origin:  env.TxContext().Origin.String(),
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
@@ -305,6 +311,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		GasIn:   uintToHex(gas),
 		GasCost: uintToHex(cost),
 		parent:  t.currentFrame,
+		Origin:  env.TxContext().Origin.String(),
 	}
 	if op == vm.EQ {
 		left := scope.Stack.Back(0).Hex()
