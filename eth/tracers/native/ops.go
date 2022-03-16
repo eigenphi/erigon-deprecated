@@ -289,6 +289,14 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		t.currentDepth += 1
 		return
 	}
+
+	frame := OpsCallFrame{
+		Type:    op.String(),
+		GasIn:   uintToHex(gas),
+		GasCost: uintToHex(cost),
+		parent:  t.currentFrame,
+	}
+	t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.
