@@ -317,13 +317,13 @@ func (t *OpsTracer) CaptureAccountWrite(account common.Address) error {
 // GetResult returns the json-encoded nested list of call traces, and any
 // error arising from the encoding or forceful termination (via `Stop`).
 func (t *OpsTracer) GetResult() (json.RawMessage, error) {
-	if len(t.callstack.Error) != 0 {
-		t.callstack.Calls = []*OpsCallFrame{}
-	}
-	if t.reason != nil {
-		t.callstack.Error = t.reason.Error()
-		t.callstack.Calls = []*OpsCallFrame{}
-	}
+	//if len(t.callstack.Error) != 0 {
+	//	t.callstack.Calls = []*OpsCallFrame{}
+	//}
+	//if t.reason != nil {
+	//	t.callstack.Error = t.reason.Error()
+	//	t.callstack.Calls = []*OpsCallFrame{}
+	//}
 	res, err := json.Marshal(t.callstack)
 	if err != nil {
 		return nil, err
@@ -332,13 +332,13 @@ func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 }
 
 func (t *OpsTracer) GetCallStack() *OpsCallFrame {
-	if len(t.callstack.Error) != 0 {
-		t.callstack.Calls = []*OpsCallFrame{}
-	}
-	if t.reason != nil {
-		t.callstack.Error = t.reason.Error()
-		t.callstack.Calls = []*OpsCallFrame{}
-	}
+	//if len(t.callstack.Error) != 0 {
+	//	t.callstack.Calls = []*OpsCallFrame{}
+	//}
+	//if t.reason != nil {
+	//	t.callstack.Error = t.reason.Error()
+	//	t.callstack.Calls = []*OpsCallFrame{}
+	//}
 	return &t.callstack
 }
 
