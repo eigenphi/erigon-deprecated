@@ -243,7 +243,6 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 			// TODO handle trace transaction error
 			zap.L().Sugar().Errorf("FinalizeTx error: %s %s", tx.Hash(), err)
 		}
-		sender, _ := tx.GetSender()
 		if tx.Hash().String() == "0x0f4b98914e9f7c71fa2e5bbfff15a771e6e8dcd341345a991384b75b472bf0cf" ||
 			tx.Hash().String() == "0x97f072ed513479859b38fed1f3f229ff5f8a532051c62517037b52f9e2668b01" {
 			fmt.Println(tx.Hash().String())
