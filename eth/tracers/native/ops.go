@@ -136,6 +136,13 @@ func getLogValueHex(scope *vm.ScopeContext) string {
 	return hex.EncodeToString(scope.Memory.Data()[offset : offset+length])
 }
 
+func getCallData(offset, length uint64, scope *vm.ScopeContext) string {
+	if scope.Memory.Len() < int(offset+length) {
+		scope.Memory.Resize(offset + length)
+	}
+	return hex.EncodeToString(scope.Memory.Data()[offset : offset+length])
+}
+
 // code modified from `4byte.go`
 func (t *OpsTracer) isPrecompiled(env *vm.EVM, addr common.Address) bool {
 	activePrecompiles := vm.ActivePrecompiles(env.ChainRules())
@@ -253,11 +260,14 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			return
 		}
 		value := scope.Stack.Back(2)
+		dataOffset := scope.Stack.Back(3).Uint64()
+		dataSize := scope.Stack.Back(4).Uint64()
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			From:    strings.ToLower(scope.Contract.Address().String()),
 			To:      strings.ToLower(to.String()),
 			Value:   value.String(),
+			Input:   getCallData(dataOffset, dataSize, scope),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
@@ -295,6 +305,11 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		GasIn:   uintToHex(gas),
 		GasCost: uintToHex(cost),
 		parent:  t.currentFrame,
+	}
+	if op == vm.EQ {
+		left := scope.Stack.Back(0).Hex()
+		right := scope.Stack.Back(1).Hex()
+		frame.Input = strings.Join([]string{left, right}, " ")
 	}
 	t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
 }
