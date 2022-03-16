@@ -231,14 +231,20 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		msg, _ := tx.AsMessage(*signer, block.BaseFee())
 
 		tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
-		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
 		if err != nil {
 			// TODO handle trace transaction error
 			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)
 		}
-		data, _ := json.Marshal(tracerResult)
-		output.Write(data)
-		output.Write([]byte("\n"))
+		err = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
+		if err != nil {
+			// TODO handle trace transaction error
+			zap.L().Sugar().Errorf("FinalizeTx error: %s %s", tx.Hash(), err)
+		}
+		if tx.Hash().String() == "0x0f4b98914e9f7c71fa2e5bbfff15a771e6e8dcd341345a991384b75b472bf0cf" {
+			data, _ := json.Marshal(tracerResult)
+			output.Write(data)
+			output.Write([]byte("\n"))
+		}
 
 		//var baseFee *big.Int
 		//if chainConfig.IsLondon(block.Number().Uint64()) && block.Hash() != (common.Hash{}) {
