@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/jsonpb"
 	jsoniter "github.com/json-iterator/go"
@@ -219,7 +220,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 
 	signer := types.MakeSigner(chainConfig, block.NumberU64())
 
-	out := jsonpb.Marshaler{EmitDefaults: true}
+	//out := jsonpb.Marshaler{EmitDefaults: true}
 	for idx, tx := range block.Transactions() {
 		select {
 		default:
@@ -235,21 +236,24 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 			// TODO handle trace transaction error
 			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)
 		}
+		data, _ := json.Marshal(tracerResult)
+		output.Write(data)
+		output.Write([]byte("\n"))
 
-		var baseFee *big.Int
-		if chainConfig.IsLondon(block.Number().Uint64()) && block.Hash() != (common.Hash{}) {
-			baseFee = block.BaseFee()
-		}
-		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
-		pbTx := toPbTraceTransaction(rtx, tx, tracerResult)
-		if err := out.Marshal(output, &pbTx); err != nil {
-			return fmt.Errorf("failed to encode transaction: %s", err)
-		}
-		if idx+1 != len(block.Transactions()) {
-			if _, err := output.Write(separator); err != nil {
-				return fmt.Errorf("failed to write newline: %s", err)
-			}
-		}
+		//var baseFee *big.Int
+		//if chainConfig.IsLondon(block.Number().Uint64()) && block.Hash() != (common.Hash{}) {
+		//	baseFee = block.BaseFee()
+		//}
+		//rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
+		//pbTx := toPbTraceTransaction(rtx, tx, tracerResult)
+		//if err := out.Marshal(output, &pbTx); err != nil {
+		//	return fmt.Errorf("failed to encode transaction: %s", err)
+		//}
+		//if idx+1 != len(block.Transactions()) {
+		//	if _, err := output.Write(separator); err != nil {
+		//		return fmt.Errorf("failed to write newline: %s", err)
+		//	}
+		//}
 	}
 	return nil
 }
