@@ -245,8 +245,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		}
 		sender, _ := tx.GetSender()
 		if tx.Hash().String() == "0x0f4b98914e9f7c71fa2e5bbfff15a771e6e8dcd341345a991384b75b472bf0cf" ||
-			sender.String() == "0x31f63be4bacd5f5f35ce93e19ddb3742a48ae773" || tx.GetTo().String() == "0x31f63be4bacd5f5f35ce93e19ddb3742a48ae773" ||
-			sender.String() == "0x31f63be4bacd5f5f35ce93e19ddb3742a48ae773" || tx.GetTo().String() == "0xc935b5cafecad427bac633bd7dbde5c392e3ef0a" {
+			tx.Hash().String() == "0x97f072ed513479859b38fed1f3f229ff5f8a532051c62517037b52f9e2668b01" {
 			fmt.Println(tx.Hash().String())
 			data, _ := json.Marshal(tracerResult)
 			fmt.Printf(string(data))
