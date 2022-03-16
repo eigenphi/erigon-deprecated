@@ -230,6 +230,9 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		ibs.Prepare(tx.Hash(), block.Hash(), idx)
 		msg, _ := tx.AsMessage(*signer, block.BaseFee())
 
+		txCtx.Origin = msg.From()
+		txCtx.TxHash = tx.Hash()
+		txCtx.GasPrice = tx.GetPrice().ToBig()
 		tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
 		if err != nil {
 			// TODO handle trace transaction error
