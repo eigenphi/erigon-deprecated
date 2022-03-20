@@ -198,6 +198,13 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 		},
 	}
 
+	exportBlockParquet := &cobra.Command{
+		Use: "parquet",
+		Run: func(cmd *cobra.Command, args []string) {
+			//exportParquet()
+		},
+	}
+
 	exportTxTrace := &cobra.Command{
 		Use: "transaction_trace [start] [end(optional)]",
 		Example: `./rpcdaemon export transaction_trace 122 ( export transaction_trace only on height: 122)
@@ -288,14 +295,15 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 	exportTxTrace.PersistentFlags().BoolVar(&outJsonL, "out-jsonl", true, "save export data as jsonl file")
 	exportTxTrace.PersistentFlags().BoolVar(&outProtobuf, "out-proto", false, "save export data as protobuf serialized file")
 
-	exportBlock.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
-	exportTx.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
-	exportTxTrace.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
+	for _, cmd := range []*cobra.Command{exportBlock, exportTx, exportTxTrace, exportBlockParquet} {
+		cmd.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
+	}
 
 	ExportCmd.AddCommand(exportBlock)
 	ExportCmd.AddCommand(exportTx)
 	ExportCmd.AddCommand(exportTxTrace)
-	ExportCmd.PersistentFlags().StringVar(&exportTrace, "runtime-trace", "", "golang process runtime trace")
+	ExportCmd.AddCommand(exportBlockParquet)
 
+	ExportCmd.PersistentFlags().StringVar(&exportTrace, "runtime-trace", "", "golang process runtime trace")
 	return ExportCmd
 }
