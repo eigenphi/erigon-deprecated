@@ -8,10 +8,11 @@ require (
 	github.com/RoaringBitmap/roaring v0.9.4
 	github.com/VictoriaMetrics/fastcache v1.9.0
 	github.com/VictoriaMetrics/metrics v1.18.1
-	github.com/anacrolix/go-libutp v1.1.0
-	github.com/anacrolix/log v0.10.0
-	github.com/anacrolix/torrent v1.40.1
-	github.com/btcsuite/btcd v0.22.0-beta
+	github.com/anacrolix/go-libutp v1.0.4
+	github.com/anacrolix/log v0.8.0
+	github.com/anacrolix/torrent v1.25.1
+	github.com/apache/arrow/go/v8 v8.0.0-20220316234955-ecf8c753c0e9
+	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/c2h5oh/datasize v0.0.0-20200825124411-48ed595a09d2
 	github.com/consensys/gnark-crypto v0.4.1-0.20210426202927-39ac3d4b3f1f
 	github.com/davecgh/go-spew v1.1.1
@@ -22,7 +23,7 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/fjl/gencodec v0.0.0-20191126094850-e283372f291f
 	github.com/fortytw2/leaktest v1.3.0 // indirect
-	github.com/goccy/go-json v0.7.4
+	github.com/goccy/go-json v0.7.10
 	github.com/gofrs/flock v0.8.1
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4
@@ -66,8 +67,7 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20220204135822-1c1b9b1eba6a
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
-	google.golang.org/genproto v0.0.0-20210917145530-b395a37504d4 // indirect
-	google.golang.org/grpc v1.42.0
+	google.golang.org/grpc v1.44.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
