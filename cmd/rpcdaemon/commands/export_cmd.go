@@ -194,7 +194,10 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 	exportBlockParquet := &cobra.Command{
 		Use: "parquet",
 		Run: func(cmd *cobra.Command, args []string) {
-			//exportParquet()
+			filename := "erigon.parquet"
+			if err := exportParquet(filename); err != nil {
+				zap.L().Sugar().Errorf("export parquet failed %s", err)
+			}
 		},
 	}
 
