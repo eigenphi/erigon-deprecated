@@ -240,7 +240,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 					zap.L().Sugar().Info("startBlock (%d) > endBlock (%d)")
 					return
 				}
-				filename = fmt.Sprintf("trace_parquet%d-%d", startBlock, endBlock)
+				filename = fmt.Sprintf("trace_parquet_%d-%d", startBlock, endBlock)
 			}
 
 			filename += ".parquet"
