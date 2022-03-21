@@ -160,6 +160,76 @@ func (api *PrivateDebugAPIImpl) getSimpleTx(ctx context.Context, blockNr rpc.Blo
 	return nil
 }
 
+func (api *PrivateDebugAPIImpl) TraceSingleBlockRaw(ctx context.Context, blockNr rpc.BlockNumber, config *tracers.TraceConfig) ([]protobuf.TraceTransaction, error) {
+
+	tx, err := api.db.BeginRo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var block *types.Block
+	block, err = api.blockByRPCNumber(blockNr, tx)
+	if err != nil {
+		return nil, err
+	}
+	if block == nil {
+		return nil, fmt.Errorf("block %d not found", blockNr)
+	}
+
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	contractHasTEVM := func(contractHash common.Hash) (bool, error) { return false, nil }
+	if api.TevmEnabled {
+		contractHasTEVM = ethdb.GetHasTEVM(tx)
+	}
+
+	getHeader := func(hash common.Hash, number uint64) *types.Header {
+		return rawdb.ReadHeader(tx, hash, number)
+	}
+
+	_, blockCtx, _, ibs, reader, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, contractHasTEVM, ethash.NewFaker(), tx, block.Hash(), 0)
+	if err != nil {
+		return nil, err
+	}
+
+	signer := types.MakeSigner(chainConfig, block.NumberU64())
+	rets := make([]protobuf.TraceTransaction, len(block.Transactions()))
+
+	for idx, tx := range block.Transactions() {
+		select {
+		default:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		ibs.Prepare(tx.Hash(), block.Hash(), idx)
+		msg, _ := tx.AsMessage(*signer, block.BaseFee())
+		txCtx := vm.TxContext{
+			TxHash:   tx.Hash(),
+			Origin:   msg.From(),
+			GasPrice: msg.GasPrice().ToBig(),
+		}
+
+		tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
+		if err != nil {
+			// TODO handle trace transaction error
+			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)
+		}
+
+		var baseFee *big.Int
+		if chainConfig.IsLondon(block.Number().Uint64()) && block.Hash() != (common.Hash{}) {
+			baseFee = block.BaseFee()
+		}
+		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
+		pbTx := toPbTraceTransaction(rtx, tx, tracerResult)
+		rets[idx] = pbTx
+	}
+	return rets, nil
+}
+
 func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rpc.BlockNumber, config *tracers.TraceConfig, output io.Writer, separator []byte) error {
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {

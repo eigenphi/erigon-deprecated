@@ -8,6 +8,7 @@ require (
 	github.com/VictoriaMetrics/metrics v1.18.1
 	github.com/anacrolix/log v0.8.0
 	github.com/anacrolix/torrent v1.25.1
+	github.com/apache/arrow/go/v8 v8.0.0-20220316234955-ecf8c753c0e9
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/c2h5oh/datasize v0.0.0-20200825124411-48ed595a09d2
 	github.com/consensys/gnark-crypto v0.4.1-0.20210426202927-39ac3d4b3f1f
@@ -19,7 +20,7 @@ require (
 	github.com/emicklei/dot v0.16.0
 	github.com/fatih/color v1.12.0
 	github.com/fjl/gencodec v0.0.0-20191126094850-e283372f291f
-	github.com/goccy/go-json v0.7.4
+	github.com/goccy/go-json v0.7.10
 	github.com/gofrs/flock v0.8.1
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4
@@ -55,10 +56,10 @@ require (
 	go.uber.org/zap v1.17.0
 	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211030160813-b3129d9d1021
+	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
-	golang.org/x/tools v0.1.7
-	google.golang.org/grpc v1.42.0
+	golang.org/x/tools v0.1.9
+	google.golang.org/grpc v1.44.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
