@@ -6,9 +6,9 @@ require (
 	github.com/RoaringBitmap/roaring v0.9.4
 	github.com/VictoriaMetrics/fastcache v1.9.0
 	github.com/VictoriaMetrics/metrics v1.18.1
-	github.com/anacrolix/go-libutp v1.0.4
-	github.com/anacrolix/log v0.8.0
-	github.com/anacrolix/torrent v1.25.1
+	github.com/anacrolix/go-libutp v1.1.0
+	github.com/anacrolix/log v0.10.0
+	github.com/anacrolix/torrent v1.40.1
 	github.com/apache/arrow/go/v8 v8.0.0-20220316234955-ecf8c753c0e9
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/c2h5oh/datasize v0.0.0-20200825124411-48ed595a09d2
