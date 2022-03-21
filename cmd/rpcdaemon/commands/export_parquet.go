@@ -14,28 +14,29 @@ import (
 )
 
 type PlainStackFrame struct {
-	FrameId         string
-	Type            string
-	Label           string
-	From            string
-	To              string
-	ContractCreated string
-	Value           string
-	Input           string
-	Error           string
+	FrameId         string `parquet:"fieldid=0,logical=String"`
+	Type            string `parquet:"fieldid=1,logical=String"`
+	Label           string `parquet:"fieldid=2,logical=String"`
+	From            string `parquet:"fieldid=3,logical=String"`
+	To              string `parquet:"fieldid=4,logical=String"`
+	ContractCreated string `parquet:"fieldid=5,logical=String"`
+	Value           string `parquet:"fieldid=6,logical=String"`
+	Input           string `parquet:"fieldid=7,logical=String"`
+	Error           string `parquet:"fieldid=8,logical=String"`
+	ChildrenCount   int32  `parquet:"fieldid=9"`
 }
 
 type ExportTraceParquet struct {
-	BlockNumber      int64
-	TransactionHash  string
-	TransactionIndex int32
-	FromAddress      string
-	ToAddress        string
-	GasPrice         int64
-	Input            string
-	Nonce            int64
-	TransactionValue string
-	Stack            []PlainStackFrame
+	BlockNumber      int64             `parquet:"fieldid=0"`
+	TransactionHash  string            `parquet:"fieldid=1,logical=String"`
+	TransactionIndex int32             `parquet:"fieldid=2"`
+	FromAddress      string            `parquet:"fieldid=3,logical=String"`
+	ToAddress        string            `parquet:"fieldid=4,logical=String"`
+	GasPrice         int64             `parquet:"fieldid=5"`
+	Input            string            `parquet:"fieldid=6,logical=String"`
+	Nonce            int64             `parquet:"fieldid=7"`
+	TransactionValue string            `parquet:"fieldid=8,logical=String"`
+	Stack            []PlainStackFrame `parquet:"fieldid=9"`
 }
 
 func dfs(node *protobuf.StackFrame, prefix string, sks []PlainStackFrame) {
@@ -52,6 +53,7 @@ func dfs(node *protobuf.StackFrame, prefix string, sks []PlainStackFrame) {
 		Value:           node.Value,
 		Input:           node.Input,
 		Error:           node.Error,
+		ChildrenCount:   int32(len(node.GetCalls())),
 	})
 	for i, call := range node.GetCalls() {
 		cPrefix := fmt.Sprintf("%s_%d", prefix, i)
@@ -79,13 +81,22 @@ func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
 
 	dfs(tx.Stack, "0", e.Stack)
 }
-
-func exportParquet(filename string) error {
+func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
+
+	var data = make([]ExportTraceParquet, len(traces))
+	for i := range traces {
+		data[i].setFromPb(&traces[i])
+	}
+
+	return exportParquetWithData(file, data)
+}
+
+func exportParquetWithData(file *os.File, data []ExportTraceParquet) error {
 
 	psc, err := schema.NewSchemaFromStruct(&ExportTraceParquet{})
 	if err != nil {
@@ -97,21 +108,31 @@ func exportParquet(filename string) error {
 		return fmt.Errorf("failed to create array schema from schema: %v", err)
 	}
 
-	wr, err := pqarrow.NewFileWriter(sc, file,
-		parquet.NewWriterProperties(parquet.WithCompression(compress.Codecs.Zstd),
-			parquet.WithDictionaryDefault(true),
-			parquet.WithDataPageSize(100*1024)),
-		pqarrow.DefaultWriterProps())
+	wr, err := pqarrow.NewFileWriter(sc, file, parquet.NewWriterProperties(parquet.WithCompression(compress.Codecs.Zstd),
+		parquet.WithDictionaryDefault(true),
+		parquet.WithDataPageSize(100*1024),
+	),
+		pqarrow.DefaultWriterProps(),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create file writer: %v", err)
 	}
 	defer wr.Close()
-	var data = make([]ExportTraceParquet, 2)
-	return saveParquet(wr, sc, data)
 
+	return saveParquet(wr, sc, data)
 }
 func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTraceParquet) error {
 	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
+	for i := range sc.Fields() {
+		fmt.Println(i, sc.Field(i).String())
+		if i+1 == len(sc.Fields()) {
+			lt := sc.Field(i).Type.(*arrow.ListType)
+			st := lt.Fields()[0].Type.(*arrow.StructType)
+			for j := range st.Fields() {
+				fmt.Println(j, st.Fields()[j].String())
+			}
+		}
+	}
 	b := array.NewRecordBuilder(mem, sc)
 	defer b.Release()
 	for _, v := range data {
@@ -135,12 +156,11 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 		//TransactionValue string
 		b.Field(8).(*array.StringBuilder).Append(v.TransactionValue)
 		//Stack            []PlainStackFrame
-		stacksBuilder := b.Field(9).(*array.ListBuilder)
-		stacksBuilder.Append(true)
+		lb := b.Field(9).(*array.ListBuilder)
+		lb.Append(true)
+		stackBuilder := lb.ValueBuilder().(*array.StructBuilder)
 		for _, stack := range v.Stack {
-			stacksBuilder.Append(true)
-
-			stackBuilder := stacksBuilder.ValueBuilder().(*array.StructBuilder)
+			stackBuilder.Append(true)
 
 			//FrameId         string
 			stackBuilder.FieldBuilder(0).(*array.StringBuilder).Append(stack.FrameId)
@@ -160,6 +180,8 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 			stackBuilder.FieldBuilder(7).(*array.StringBuilder).Append(stack.Input)
 			//Error           string
 			stackBuilder.FieldBuilder(8).(*array.StringBuilder).Append(stack.Error)
+			//ChildrenCount   int32  `parquet:"fieldid=9"`
+			stackBuilder.FieldBuilder(9).(*array.Int32Builder).Append(stack.ChildrenCount)
 		}
 
 	}

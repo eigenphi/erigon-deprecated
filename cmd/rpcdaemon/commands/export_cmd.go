@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli/httpcfg"
+	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
 	"github.com/ledgerwatch/erigon/eth/tracers"
 	"github.com/ledgerwatch/erigon/rpc"
 	v3log "github.com/ledgerwatch/log/v3"
@@ -201,9 +202,79 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 	exportBlockParquet := &cobra.Command{
 		Use: "parquet",
 		Run: func(cmd *cobra.Command, args []string) {
-			filename := "erigon.parquet"
-			if err := exportParquet(filename); err != nil {
-				zap.L().Sugar().Errorf("export parquet failed %s", err)
+
+			logger := v3log.New()
+
+			var startBlock, endBlock rpc.BlockNumber
+			_ = endBlock
+			if err := startBlock.UnmarshalJSON([]byte(args[0])); err != nil {
+				return
+			}
+			endBlock = startBlock
+			if len(args) == 2 {
+				if err := endBlock.UnmarshalJSON([]byte(args[1])); err != nil {
+					zlog.Errorf("parse endBlock failed %s", err)
+					return
+				}
+			}
+
+			ctx := cmd.Context()
+			db, eth, txPool, mining, stateCache, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			if err != nil {
+				zlog.Errorf("Could not connect to DB: %s", err)
+				os.Exit(1)
+			}
+			_, _, _ = eth, txPool, mining
+			defer db.Close()
+
+			base := NewBaseApi(nil, stateCache, cfg.SingleNodeMode)
+			if cfg.TevmEnabled {
+				base.EnableTevmExperiment()
+			}
+			//ethImpl := NewEthAPI(base, db, eth, txPool, mining, cfg.Gascap)
+
+			filename := fmt.Sprintf("trace_parquet_%d", startBlock)
+			if endBlock != 0 {
+				if startBlock.Int64() > endBlock.Int64() {
+					zap.L().Sugar().Info("startBlock (%d) > endBlock (%d)")
+					return
+				}
+				filename = fmt.Sprintf("trace_parquet%d-%d", startBlock, endBlock)
+			}
+
+			filename += ".parquet"
+
+			path := filepath.Join(outputDir, filename)
+			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+			if err != nil {
+				zlog.Errorf("open file failed: %s", err)
+				return
+			}
+			defer file.Close()
+			debugImpl := NewPrivateDebugAPI(base, db, cfg.Gascap)
+
+			tracerName := "opsTracer"
+			//ctx = context.WithValue(ctx, "logger", logger)
+			//for height := startBlock; height <= endBlock; height++ {
+			//	if err := debugImpl.TraceSingleBlock(ctx, height, &tracers.TraceConfig{
+			//		Tracer: &tracerName,
+			//	}, file, []byte("\n")); err != nil {
+			//		zlog.Errorf("could not trace block: %s", err)
+
+			var data []protobuf.TraceTransaction
+			zap.L().Sugar().Infof("start - end(%d-%d)", startBlock.Int64(), endBlock.Int64())
+			for height := startBlock; height <= endBlock; height++ {
+				rets, err := debugImpl.TraceSingleBlockRaw(ctx, height, &tracers.TraceConfig{Tracer: &tracerName})
+				if err != nil {
+					zap.L().Sugar().Errorf("trace single block failed %s", err)
+					return
+				}
+				zap.L().Sugar().Infof("trace success from block %d", height.Int64())
+				data = append(data, rets...)
+			}
+
+			if err := exportParquet(filename, data); err != nil {
+				zap.L().Sugar().Errorf("export parquet %s", err)
 			}
 		},
 	}
@@ -295,6 +366,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, rootCancel context.CancelFunc) *cobra.Co
 			zlog.Info("export transactions trace data to ", path)
 		},
 	}
+
 	exportTxTrace.PersistentFlags().BoolVar(&outJsonL, "out-jsonl", true, "save export data as jsonl file")
 	exportTxTrace.PersistentFlags().BoolVar(&outProtobuf, "out-proto", false, "save export data as protobuf serialized file")
 
