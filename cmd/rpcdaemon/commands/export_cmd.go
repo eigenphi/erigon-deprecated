@@ -266,7 +266,7 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 				data = append(data, rets...)
 			}
 
-			if err := exportParquet(filename, data); err != nil {
+			if err := exportParquet(path, data); err != nil {
 				zap.L().Sugar().Errorf("export parquet %s", err)
 			}
 		},
