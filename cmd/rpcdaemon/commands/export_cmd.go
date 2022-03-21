@@ -232,7 +232,7 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 					zap.L().Sugar().Info("startBlock (%d) > endBlock (%d)")
 					return
 				}
-				filename = fmt.Sprintf("trace_parquet%d-%d", startBlock, endBlock)
+				filename = fmt.Sprintf("trace_parquet_%d-%d", startBlock, endBlock)
 			}
 
 			filename += ".parquet"
