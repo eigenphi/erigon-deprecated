@@ -10,6 +10,7 @@ import (
 	"github.com/apache/arrow/go/v8/parquet/pqarrow"
 	"github.com/apache/arrow/go/v8/parquet/schema"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
+	"go.uber.org/zap"
 	"os"
 )
 
@@ -39,11 +40,11 @@ type ExportTraceParquet struct {
 	Stack            []PlainStackFrame `parquet:"fieldid=9"`
 }
 
-func dfs(node *protobuf.StackFrame, prefix string, sks []PlainStackFrame) {
+func dfs(node *protobuf.StackFrame, prefix string, sks *[]PlainStackFrame) {
 	if node == nil {
 		return
 	}
-	sks = append(sks, PlainStackFrame{
+	*sks = append(*sks, PlainStackFrame{
 		FrameId:         prefix,
 		Type:            node.Type,
 		Label:           node.Label,
@@ -77,9 +78,7 @@ func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
 	e.Input = tx.Input
 	e.Nonce = tx.Nonce
 	e.TransactionValue = tx.TransactionValue
-	e.Stack = make([]PlainStackFrame, 0)
-
-	dfs(tx.Stack, "0", e.Stack)
+	dfs(tx.Stack, "0", &e.Stack)
 }
 func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
@@ -135,6 +134,7 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 	}
 	b := array.NewRecordBuilder(mem, sc)
 	defer b.Release()
+
 	for _, v := range data {
 
 		//BlockNumber      int64
@@ -158,32 +158,32 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 		//Stack            []PlainStackFrame
 		lb := b.Field(9).(*array.ListBuilder)
 		lb.Append(true)
-		stackBuilder := lb.ValueBuilder().(*array.StructBuilder)
 		for _, stack := range v.Stack {
-			stackBuilder.Append(true)
+			lvb := lb.ValueBuilder().(*array.StructBuilder)
+			lvb.Append(true)
+			zap.L().Info("append frame id", zap.String("frame id", stack.FrameId))
 
 			//FrameId         string
-			stackBuilder.FieldBuilder(0).(*array.StringBuilder).Append(stack.FrameId)
+			lvb.FieldBuilder(0).(*array.StringBuilder).Append(stack.FrameId)
 			//Type            string
-			stackBuilder.FieldBuilder(1).(*array.StringBuilder).Append(stack.Type)
+			lvb.FieldBuilder(1).(*array.StringBuilder).Append(stack.Type)
 			//Label           string
-			stackBuilder.FieldBuilder(2).(*array.StringBuilder).Append(stack.Label)
+			lvb.FieldBuilder(2).(*array.StringBuilder).Append(stack.Label)
 			//From            string
-			stackBuilder.FieldBuilder(3).(*array.StringBuilder).Append(stack.From)
+			lvb.FieldBuilder(3).(*array.StringBuilder).Append(stack.From)
 			//To              string
-			stackBuilder.FieldBuilder(4).(*array.StringBuilder).Append(stack.To)
+			lvb.FieldBuilder(4).(*array.StringBuilder).Append(stack.To)
 			//ContractCreated string
-			stackBuilder.FieldBuilder(5).(*array.StringBuilder).Append(stack.ContractCreated)
+			lvb.FieldBuilder(5).(*array.StringBuilder).Append(stack.ContractCreated)
 			//Value           string
-			stackBuilder.FieldBuilder(6).(*array.StringBuilder).Append(stack.Value)
+			lvb.FieldBuilder(6).(*array.StringBuilder).Append(stack.Value)
 			//Input           string
-			stackBuilder.FieldBuilder(7).(*array.StringBuilder).Append(stack.Input)
+			lvb.FieldBuilder(7).(*array.StringBuilder).Append(stack.Input)
 			//Error           string
-			stackBuilder.FieldBuilder(8).(*array.StringBuilder).Append(stack.Error)
+			lvb.FieldBuilder(8).(*array.StringBuilder).Append(stack.Error)
 			//ChildrenCount   int32  `parquet:"fieldid=9"`
-			stackBuilder.FieldBuilder(9).(*array.Int32Builder).Append(stack.ChildrenCount)
+			lvb.FieldBuilder(9).(*array.Int32Builder).Append(stack.ChildrenCount)
 		}
-
 	}
 
 	record := b.NewRecord()
