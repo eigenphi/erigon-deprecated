@@ -10,7 +10,6 @@ import (
 	"github.com/apache/arrow/go/v8/parquet/pqarrow"
 	"github.com/apache/arrow/go/v8/parquet/schema"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
-	"go.uber.org/zap"
 	"os"
 )
 
@@ -161,7 +160,6 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 		for _, stack := range v.Stack {
 			lvb := lb.ValueBuilder().(*array.StructBuilder)
 			lvb.Append(true)
-			zap.L().Info("append frame id", zap.String("frame id", stack.FrameId))
 
 			//FrameId         string
 			lvb.FieldBuilder(0).(*array.StringBuilder).Append(stack.FrameId)
