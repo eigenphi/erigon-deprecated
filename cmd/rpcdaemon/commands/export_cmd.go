@@ -224,10 +224,19 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}
-			//ethImpl := NewEthAPI(base, db, eth, txPool, mining, cfg.Gascap)
+			ethImpl := NewEthAPI(base, db, eth, txPool, mining, cfg.Gascap)
 
 			filename := fmt.Sprintf("trace_parquet_%d", startBlock)
 			if endBlock != 0 {
+				latestNumber, err := ethImpl.BlockNumber(context.Background())
+				if err != nil {
+					zap.L().Sugar().Errorf("get latest block number failed %s", err)
+					return
+				}
+				if endBlock > rpc.BlockNumber(latestNumber) {
+					zap.L().Sugar().Infof("erigon latest block number less than endBlock %d < %d", uint64(latestNumber), int64(endBlock))
+					endBlock = rpc.BlockNumber(latestNumber)
+				}
 				if startBlock.Int64() > endBlock.Int64() {
 					zap.L().Sugar().Info("startBlock (%d) > endBlock (%d)")
 					return
