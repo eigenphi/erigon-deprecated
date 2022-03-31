@@ -30,14 +30,17 @@ var (
 const (
 	ParquetDataDirFlag = "parquet-data-dir"
 	ErigonDataDirFlag  = "erigon-data-dir"
+	RpcDaemonCliFlag   = "rpcdaemon-cli"
 )
 
 var (
-	ErigonParuqetDataDir       string
+	ErigonParquetDataDir       string
 	ErigonRecentParquetDataDir string
 
 	ErigonDataDir    string
-	RpcdaemonBInPath string
+	RpcdaemonBinPath string
+
+	MinExportInterval int64
 
 	SafeBlockGap int64
 )
@@ -68,7 +71,7 @@ func erigonLatestHeight() (int64, error) {
 var rootCmd = &cobra.Command{
 	Use: "export-parquet",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		ErigonRecentParquetDataDir = filepath.Join(ErigonParuqetDataDir, "recent")
+		ErigonRecentParquetDataDir = filepath.Join(ErigonParquetDataDir, "recent")
 		if s, err := os.Stat(ErigonRecentParquetDataDir); err != nil {
 			log.Errorf("recentDataDir not exist")
 			os.Exit(1)
@@ -77,15 +80,18 @@ var rootCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		log.Infof("ErigonParuqetDataDir: %s", ErigonParuqetDataDir)
+		log.Infof("ErigonParquetDataDir: %s", ErigonParquetDataDir)
 		log.Infof("ErigonRecentParuqetDataDir: %s", ErigonRecentParquetDataDir)
 		log.Infof("SafeBlockGap: %d", SafeBlockGap)
-		stat, err := os.Stat(ErigonParuqetDataDir)
+		log.Infof("MinExportInterval: %d", MinExportInterval)
+		log.Infof("RpcdaemonBinPath: %s", RpcdaemonBinPath)
+
+		stat, err := os.Stat(ErigonParquetDataDir)
 		if err != nil {
 			return err
 		}
 		if !stat.IsDir() {
-			return fmt.Errorf("%s is not a directory", ErigonParuqetDataDir)
+			return fmt.Errorf("%s is not a directory", ErigonParquetDataDir)
 		}
 		return nil
 	},
@@ -103,7 +109,7 @@ var rootCmd = &cobra.Command{
 
 		{
 			var brs = make(blockRanges, 0)
-			archivePaths := getParquetFilePaths(ErigonParuqetDataDir)
+			archivePaths := getParquetFilePaths(ErigonParquetDataDir)
 			brs.fromPaths(archivePaths)
 			archiveEnd = brs[len(brs)-1].end
 		}
@@ -139,24 +145,31 @@ func runUpdate(archiveEnd, recentEnd int64) error {
 				log.Errorf("erigonLatestHeight: %v", err)
 				continue
 			}
-			if lastEndBlock+SafeBlockGap > erigonLatestHeight {
-				continue
-			}
+			log.Infof("erigonLatestHeight %d", erigonLatestHeight)
 			startBlock := lastEndBlock + 1
 			endBlock := erigonLatestHeight - SafeBlockGap
-			if endBlock > archiveEnd+10000 {
-				endBlock = archiveEnd + 10000
-			}
-			if err := executeExport(ErigonParuqetDataDir, startBlock, endBlock); err != nil {
-				log.Errorf("execte parquet export %s", err)
+			if endBlock < startBlock {
 				continue
 			}
-			if endBlock == archiveEnd+10000 {
-				if err := executeExport(ErigonRecentParquetDataDir, archiveEnd+1, archiveEnd+10000); err != nil {
+			if endBlock > archiveEnd+10000 {
+				log.Infof("need export archive [%d,%d]", archiveEnd+1, archiveEnd+10000)
+				endBlock = archiveEnd + 10000
+				if err := executeExport(ErigonParquetDataDir, archiveEnd+1, archiveEnd+10000); err != nil {
 					log.Errorf("execute archive export %s", err)
+				} else {
+					archiveEnd = endBlock
+					lastEndBlock = endBlock
 				}
+			} else {
+				if endBlock-startBlock+1 < MinExportInterval {
+					continue
+				}
+				if err := executeExport(ErigonRecentParquetDataDir, startBlock, endBlock); err != nil {
+					log.Errorf("execte parquet export %s", err)
+					continue
+				}
+				lastEndBlock = endBlock
 			}
-			lastEndBlock = endBlock
 		case ch := <-ExistCh:
 			return fmt.Errorf("runUpdate received a signal: %v", ch.String())
 		}
@@ -191,10 +204,11 @@ type blockRange struct {
 }
 
 func executeExport(dataStore string, start, end int64) error {
-	log.Infof("executeExport: %d, %d", start, end)
-	return nil
+	log.Infof("executeExport: %d, %d to %s", start, end, dataStore)
 	//./erigon-rpcdaemon-ethereum.v1.3.0 --datadir /mnt/data/erigon-ethereum export parquet 14460001 14470000 --out-dir /mnt/data/erigon-parquet/
-	cmd := exec.Command(RpcdaemonBInPath, "--datadir", ErigonDataDir, "export", "parquet", fmt.Sprint(start), fmt.Sprint(end), "--out-dir", dataStore)
+	args := []string{RpcdaemonBinPath, "--datadir", ErigonDataDir, "export", "parquet", fmt.Sprint(start), fmt.Sprint(end), "--out-dir", dataStore}
+	log.Infof("execute: %s", strings.Join(args, " "))
+	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -208,7 +222,7 @@ func getParquetFilePaths(datadir string) []string {
 		}
 		base := filepath.Base(path)
 		if strings.HasPrefix(base, "trace_parquet_") && strings.HasSuffix(base, ".parquet") {
-			paths = append(paths, path)
+			paths = append(paths, base)
 		}
 		return nil
 	})
@@ -218,13 +232,19 @@ func getParquetFilePaths(datadir string) []string {
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	rootCmd.PersistentFlags().StringVar(&ErigonParuqetDataDir, ParquetDataDirFlag, "", "parquet data dir")
+	rootCmd.PersistentFlags().StringVar(&ErigonParquetDataDir, ParquetDataDirFlag, "", "parquet data dir")
 	if err := rootCmd.MarkPersistentFlagRequired(ParquetDataDirFlag); err != nil {
 		panic(err)
 	}
 
 	rootCmd.PersistentFlags().StringVar(&ErigonDataDir, ErigonDataDirFlag, "", "erigon data dir")
 	if err := rootCmd.MarkPersistentFlagRequired(ErigonDataDirFlag); err != nil {
+		panic(err)
+	}
+	rootCmd.PersistentFlags().Int64Var(&MinExportInterval, "min-export-interval", 7, "min export interval")
+
+	rootCmd.PersistentFlags().StringVar(&RpcdaemonBinPath, RpcDaemonCliFlag, "", "rpcdaemon cli")
+	if err := rootCmd.MarkPersistentFlagRequired(RpcDaemonCliFlag); err != nil {
 		panic(err)
 	}
 
