@@ -247,12 +247,6 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 			filename += ".parquet"
 
 			path := filepath.Join(outputDir, filename)
-			file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
-			if err != nil {
-				zlog.Errorf("open file failed: %s", err)
-				return
-			}
-			defer file.Close()
 			debugImpl := NewPrivateDebugAPI(base, db, cfg.Gascap)
 
 			tracerName := "opsTracer"

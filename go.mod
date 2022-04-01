@@ -43,7 +43,7 @@ require (
 	github.com/quasilyte/go-ruleguard/dsl v0.3.15
 	github.com/rs/cors v1.8.2
 	github.com/shirou/gopsutil/v3 v3.21.12
-	github.com/spf13/cobra v1.2.1
+	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
 	github.com/torquem-ch/mdbx-go v0.22.10

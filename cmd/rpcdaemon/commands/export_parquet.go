@@ -80,18 +80,22 @@ func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
 	dfs(tx.Stack, "0", &e.Stack)
 }
 func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	tmpfile := filename + ".tmp"
+	tmpf, err := os.OpenFile(tmpfile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer tmpf.Close()
 
 	var data = make([]ExportTraceParquet, len(traces))
 	for i := range traces {
 		data[i].setFromPb(&traces[i])
 	}
 
-	return exportParquetWithData(file, data)
+	if err := exportParquetWithData(tmpf, data); err != nil {
+		return fmt.Errorf("export parquet file to %s: %w", tmpfile, err)
+	}
+	return os.Rename(tmpfile, filename)
 }
 
 func exportParquetWithData(file *os.File, data []ExportTraceParquet) error {

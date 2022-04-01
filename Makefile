@@ -19,6 +19,9 @@ GO_MINOR_VERSION = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.
 
 all: erigon hack rpctest state pics rpcdaemon integration db-tools sentry txpool
 
+export-parquet:
+	CGO_ENABLED=0 $(GO) build -o $(GOBIN)/export-parquet cmd/export-parquet/main.go
+
 go-version:
 	@if [ $(GO_MINOR_VERSION) -lt 16 ]; then \
 		echo "minimum required Golang version is 1.16"; \
