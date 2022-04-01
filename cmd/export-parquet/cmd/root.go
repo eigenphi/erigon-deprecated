@@ -159,6 +159,13 @@ func runUpdate(archiveEnd, recentEnd int64) error {
 				} else {
 					archiveEnd = endBlock
 					lastEndBlock = endBlock
+					if err := os.RemoveAll(ErigonRecentParquetDataDir); err != nil {
+						log.Errorf("os.RemoveAll: %s %v", ErigonRecentParquetDataDir, err)
+					} else {
+						if err := os.Mkdir(ErigonRecentParquetDataDir, 0755); err != nil {
+							log.Errorf("os.Mkdir: %s %v", ErigonRecentParquetDataDir, err)
+						}
+					}
 				}
 			} else {
 				if endBlock-startBlock+1 < MinExportInterval {
