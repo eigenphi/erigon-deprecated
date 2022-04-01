@@ -116,6 +116,11 @@ private static final long serialVersionUID = 0L;
 
             break;
           }
+          case 88: {
+
+            blockTimestamp_ = input.readInt64();
+            break;
+          }
           default: {
             if (!parseUnknownField(
                 input, unknownFields, extensionRegistry, tag)) {
@@ -408,6 +413,17 @@ private static final long serialVersionUID = 0L;
     return getStack();
   }
 
+  public static final int BLOCKTIMESTAMP_FIELD_NUMBER = 11;
+  private long blockTimestamp_;
+  /**
+   * <code>int64 blockTimestamp = 11;</code>
+   * @return The blockTimestamp.
+   */
+  @java.lang.Override
+  public long getBlockTimestamp() {
+    return blockTimestamp_;
+  }
+
   private byte memoizedIsInitialized = -1;
   @java.lang.Override
   public final boolean isInitialized() {
@@ -451,6 +467,9 @@ private static final long serialVersionUID = 0L;
     }
     if (stack_ != null) {
       output.writeMessage(10, getStack());
+    }
+    if (blockTimestamp_ != 0L) {
+      output.writeInt64(11, blockTimestamp_);
     }
     unknownFields.writeTo(output);
   }
@@ -496,6 +515,10 @@ private static final long serialVersionUID = 0L;
       size += com.google.protobuf.CodedOutputStream
         .computeMessageSize(10, getStack());
     }
+    if (blockTimestamp_ != 0L) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt64Size(11, blockTimestamp_);
+    }
     size += unknownFields.getSerializedSize();
     memoizedSize = size;
     return size;
@@ -534,6 +557,8 @@ private static final long serialVersionUID = 0L;
       if (!getStack()
           .equals(other.getStack())) return false;
     }
+    if (getBlockTimestamp()
+        != other.getBlockTimestamp()) return false;
     if (!unknownFields.equals(other.unknownFields)) return false;
     return true;
   }
@@ -570,6 +595,9 @@ private static final long serialVersionUID = 0L;
       hash = (37 * hash) + STACK_FIELD_NUMBER;
       hash = (53 * hash) + getStack().hashCode();
     }
+    hash = (37 * hash) + BLOCKTIMESTAMP_FIELD_NUMBER;
+    hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
+        getBlockTimestamp());
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -727,6 +755,8 @@ private static final long serialVersionUID = 0L;
         stack_ = null;
         stackBuilder_ = null;
       }
+      blockTimestamp_ = 0L;
+
       return this;
     }
 
@@ -767,6 +797,7 @@ private static final long serialVersionUID = 0L;
       } else {
         result.stack_ = stackBuilder_.build();
       }
+      result.blockTimestamp_ = blockTimestamp_;
       onBuilt();
       return result;
     }
@@ -849,6 +880,9 @@ private static final long serialVersionUID = 0L;
       }
       if (other.hasStack()) {
         mergeStack(other.getStack());
+      }
+      if (other.getBlockTimestamp() != 0L) {
+        setBlockTimestamp(other.getBlockTimestamp());
       }
       this.mergeUnknownFields(other.unknownFields);
       onChanged();
@@ -1500,6 +1534,37 @@ private static final long serialVersionUID = 0L;
         stack_ = null;
       }
       return stackBuilder_;
+    }
+
+    private long blockTimestamp_ ;
+    /**
+     * <code>int64 blockTimestamp = 11;</code>
+     * @return The blockTimestamp.
+     */
+    @java.lang.Override
+    public long getBlockTimestamp() {
+      return blockTimestamp_;
+    }
+    /**
+     * <code>int64 blockTimestamp = 11;</code>
+     * @param value The blockTimestamp to set.
+     * @return This builder for chaining.
+     */
+    public Builder setBlockTimestamp(long value) {
+      
+      blockTimestamp_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>int64 blockTimestamp = 11;</code>
+     * @return This builder for chaining.
+     */
+    public Builder clearBlockTimestamp() {
+      
+      blockTimestamp_ = 0L;
+      onChanged();
+      return this;
     }
     @java.lang.Override
     public final Builder setUnknownFields(

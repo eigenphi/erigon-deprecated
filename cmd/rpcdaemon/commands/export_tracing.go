@@ -445,6 +445,7 @@ func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.
 		Nonce:            int64(tx.GetNonce()),
 		TransactionValue: tx.GetValue().String(),
 		Stack:            toPbCallTrace(tc),
+		BlockTimestamp:   tx.Time().Unix(),
 	}
 }
 

@@ -93,4 +93,5 @@ message TraceTransaction{
   int64 nonce = 8;
   string transactionValue = 9;
   stackFrame stack = 10;
+  int64 blockTimestamp = 11;
 }
