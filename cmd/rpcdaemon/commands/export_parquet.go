@@ -37,6 +37,7 @@ type ExportTraceParquet struct {
 	Nonce            int64             `parquet:"fieldid=7"`
 	TransactionValue string            `parquet:"fieldid=8,logical=String"`
 	Stack            []PlainStackFrame `parquet:"fieldid=9"`
+	BlockTimestamp   int64             `parquet:"fieldid=10"`
 }
 
 func dfs(node *protobuf.StackFrame, prefix string, sks *[]PlainStackFrame) {
@@ -77,6 +78,7 @@ func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
 	e.Input = tx.Input
 	e.Nonce = tx.Nonce
 	e.TransactionValue = tx.TransactionValue
+	e.BlockTimestamp = tx.BlockTimestamp
 	dfs(tx.Stack, "0", &e.Stack)
 }
 func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
@@ -127,7 +129,7 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
 	for i := range sc.Fields() {
 		fmt.Println(i, sc.Field(i).String())
-		if i+1 == len(sc.Fields()) {
+		if i+2 == len(sc.Fields()) {
 			lt := sc.Field(i).Type.(*arrow.ListType)
 			st := lt.Fields()[0].Type.(*arrow.StructType)
 			for j := range st.Fields() {
@@ -186,6 +188,9 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 			//ChildrenCount   int32  `parquet:"fieldid=9"`
 			lvb.FieldBuilder(9).(*array.Int32Builder).Append(stack.ChildrenCount)
 		}
+
+		//BlockTimestamp
+		b.Field(10).(*array.Int64Builder).Append(v.BlockTimestamp)
 	}
 
 	record := b.NewRecord()
