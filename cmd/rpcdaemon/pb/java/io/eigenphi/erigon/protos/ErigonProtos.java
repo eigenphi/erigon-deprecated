@@ -88,15 +88,15 @@ public final class ErigonProtos {
       "ber\030\002 \001(\003\022\021\n\tblockHash\030\003 \001(\t\022\022\n\nparentHa" +
       "sh\030\004 \001(\t\022\r\n\005miner\030\006 \001(\t\022\021\n\tblockSize\030\007 \001" +
       "(\005\022\020\n\010gasLimit\030\010 \001(\003\022\017\n\007gasUsed\030\t \001(\003\022\026\n" +
-      "\016blockTimestamp\030\n \001(\003\"\357\001\n\020TraceTransacti" +
+      "\016blockTimestamp\030\n \001(\003\"\207\002\n\020TraceTransacti" +
       "on\022\023\n\013blockNumber\030\001 \001(\003\022\027\n\017transactionHa" +
       "sh\030\002 \001(\t\022\030\n\020transactionIndex\030\003 \001(\005\022\023\n\013fr" +
       "omAddress\030\004 \001(\t\022\021\n\ttoAddress\030\005 \001(\t\022\020\n\010ga" +
       "sPrice\030\006 \001(\003\022\r\n\005input\030\007 \001(\t\022\r\n\005nonce\030\010 \001" +
       "(\003\022\030\n\020transactionValue\030\t \001(\t\022!\n\005stack\030\n " +
-      "\001(\0132\022.erigon.stackFrameB7\n\031io.eigenphi.e" +
-      "rigon.protosB\014ErigonProtosP\001Z\n./protobuf" +
-      "b\006proto3"
+      "\001(\0132\022.erigon.stackFrame\022\026\n\016blockTimestam" +
+      "p\030\013 \001(\003B7\n\031io.eigenphi.erigon.protosB\014Er" +
+      "igonProtosP\001Z\n./protobufb\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -143,7 +143,7 @@ public final class ErigonProtos {
     internal_static_erigon_TraceTransaction_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_erigon_TraceTransaction_descriptor,
-        new java.lang.String[] { "BlockNumber", "TransactionHash", "TransactionIndex", "FromAddress", "ToAddress", "GasPrice", "Input", "Nonce", "TransactionValue", "Stack", });
+        new java.lang.String[] { "BlockNumber", "TransactionHash", "TransactionIndex", "FromAddress", "ToAddress", "GasPrice", "Input", "Nonce", "TransactionValue", "Stack", "BlockTimestamp", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

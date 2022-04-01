@@ -105,4 +105,10 @@ public interface TraceTransactionOrBuilder extends
    * <code>.erigon.stackFrame stack = 10;</code>
    */
   io.eigenphi.erigon.protos.stackFrameOrBuilder getStackOrBuilder();
+
+  /**
+   * <code>int64 blockTimestamp = 11;</code>
+   * @return The blockTimestamp.
+   */
+  long getBlockTimestamp();
 }
