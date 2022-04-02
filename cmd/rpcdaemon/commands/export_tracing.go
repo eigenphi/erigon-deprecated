@@ -318,7 +318,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlockRaw(ctx context.Context, blockNr
 			baseFee = block.BaseFee()
 		}
 		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
-		pbTx := toPbTraceTransaction(rtx, tx, tracerResult)
+		pbTx := toPbTraceTransaction(rtx, tx, tracerResult, int64(block.Time()))
 		rets[idx] = pbTx
 	}
 	return rets, nil
@@ -387,7 +387,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 			baseFee = block.BaseFee()
 		}
 		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
-		pbTx := toPbTraceTransaction(rtx, tx, tracerResult)
+		pbTx := toPbTraceTransaction(rtx, tx, tracerResult, int64(block.Time()))
 		if err := out.Marshal(output, &pbTx); err != nil {
 			return fmt.Errorf("failed to encode transaction: %s", err)
 		}
@@ -429,7 +429,7 @@ func toPbSimpleTransaction(rtx *RPCTransaction, tx types.Transaction, blkTs uint
 	}
 }
 
-func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCallFrame) protobuf.TraceTransaction {
+func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCallFrame, blockTimestamp int64) protobuf.TraceTransaction {
 	var to string
 	if rtx.To != nil {
 		to = strings.ToLower(rtx.To.String())
@@ -445,7 +445,7 @@ func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.
 		Nonce:            int64(tx.GetNonce()),
 		TransactionValue: tx.GetValue().String(),
 		Stack:            toPbCallTrace(tc),
-		BlockTimestamp:   tx.Time().Unix(),
+		BlockTimestamp:   blockTimestamp,
 	}
 }
 
