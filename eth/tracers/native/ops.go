@@ -169,6 +169,18 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		return nil
 	}
+	// Fix txs like 0x3494b6a2f62a558c46660691f68e4e2a47694e0b02fad1969e1f0dc725fc9ee5,
+	// where a sub-CALL is failed but the whole tx is not reverted.
+	if t.currentDepth == depth+1 && (t.currentFrame.Type == vm.CALL.String() ||
+		t.currentFrame.Type == vm.CALLCODE.String() ||
+		t.currentFrame.Type == vm.DELEGATECALL.String() ||
+		t.currentFrame.Type == vm.STATICCALL.String() ||
+		t.currentFrame.Type == vm.CREATE.String() ||
+		t.currentFrame.Type == vm.CREATE2.String()) {
+		t.currentFrame.Error = "Subcall reverted"
+		t.currentFrame = t.currentFrame.parent
+		t.currentDepth -= 1
+	}
 
 	if op == vm.LOG0 || op == vm.LOG1 || op == vm.LOG2 || op == vm.LOG3 || op == vm.LOG4 {
 		var topic0, topic1, topic2, topic3, logInput string
