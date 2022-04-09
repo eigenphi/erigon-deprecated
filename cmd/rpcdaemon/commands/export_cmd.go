@@ -10,9 +10,12 @@ import (
 	v3log "github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"golang.org/x/sync/semaphore"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/trace"
+	"sync"
 )
 
 var ExportCmd = &cobra.Command{
@@ -259,14 +262,33 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 
 			var data []protobuf.TraceTransaction
 			zap.L().Sugar().Infof("start - end(%d-%d)", startBlock.Int64(), endBlock.Int64())
+
+			maxN := int64(runtime.NumCPU() - 2)
+			sw := semaphore.NewWeighted(maxN)
+			mu := sync.Mutex{}
 			for height := startBlock; height <= endBlock; height++ {
-				rets, err := debugImpl.TraceSingleBlockRaw(ctx, height, &tracers.TraceConfig{Tracer: &tracerName})
-				if err != nil {
-					zap.L().Sugar().Errorf("trace single block failed %s", err)
+				if err := sw.Acquire(ctx, 1); err != nil {
+					zap.L().Sugar().Errorf("acquire semaphore failed %s", err)
 					return
 				}
-				zap.L().Sugar().Infof("trace success from block %d", height.Int64())
-				data = append(data, rets...)
+
+				go func(height rpc.BlockNumber) {
+					defer sw.Release(1)
+
+					rets, err := debugImpl.TraceSingleBlockRaw(ctx, height, &tracers.TraceConfig{Tracer: &tracerName})
+					if err != nil {
+						zap.L().Sugar().Errorf("trace single block failed %s", err)
+						return
+					}
+					zap.L().Sugar().Infof("trace success from block %d", height.Int64())
+					mu.Lock()
+					data = append(data, rets...)
+					mu.Unlock()
+				}(height)
+			}
+			if err := sw.Acquire(ctx, maxN); err != nil {
+				zap.L().Sugar().Errorf("accquire all semaphore failed %s", err)
+				return
 			}
 
 			if err := exportParquet(path, data); err != nil {
