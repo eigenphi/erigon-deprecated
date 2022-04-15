@@ -227,6 +227,9 @@ func getParquetFilePaths(datadir string) []string {
 		if d.IsDir() {
 			return nil
 		}
+		if strings.Contains(path, "recent") {
+			return nil
+		}
 		base := filepath.Base(path)
 		if strings.HasPrefix(base, "trace_parquet_") && strings.HasSuffix(base, ".parquet") {
 			paths = append(paths, base)
