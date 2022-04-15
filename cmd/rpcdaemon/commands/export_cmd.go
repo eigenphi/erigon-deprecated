@@ -10,12 +10,14 @@ import (
 	v3log "github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/trace"
 	"sync"
+	"time"
 )
 
 var ExportCmd = &cobra.Command{
@@ -25,7 +27,7 @@ var ExportCmd = &cobra.Command{
 func init() {
 }
 
-func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command {
+func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.CancelFunc) *cobra.Command {
 	var (
 		outJsonL    bool
 		outProtobuf bool
@@ -297,6 +299,124 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 		},
 	}
 
+	exportBlockStreamParquet := &cobra.Command{
+		Use: "stream-parquet",
+		Run: func(cmd *cobra.Command, args []string) {
+
+			logger := v3log.New()
+
+			var startBlock rpc.BlockNumber
+
+			ctx := cmd.Context()
+			db, eth, txPool, mining, stateCache, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			if err != nil {
+				zlog.Errorf("Could not connect to DB: %s", err)
+				os.Exit(1)
+			}
+			_, _, _ = eth, txPool, mining
+			defer db.Close()
+
+			baseApi := NewBaseApi(nil, stateCache, cfg.SingleNodeMode)
+			if cfg.TevmEnabled {
+				baseApi.EnableTevmExperiment()
+			}
+
+			debugImpl := NewPrivateDebugAPI(baseApi, db, cfg.Gascap)
+
+			tracerName := "opsTracer"
+
+			traceTasks := make(chan rpc.BlockNumber, 10)
+
+			type parquetTask struct {
+				height rpc.BlockNumber
+				traces []protobuf.TraceTransaction
+			}
+			parquetTasks := make(chan parquetTask, 10000)
+
+			eg, ctx := errgroup.WithContext(ctx)
+			eg.Go(func() error {
+				tk := time.NewTicker(time.Second * 10)
+				for {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case <-tk.C:
+						ethImpl := NewEthAPI(baseApi, db, eth, txPool, mining, cfg.Gascap)
+						latestNumber, err := ethImpl.BlockNumber(ctx)
+						if err != nil {
+							zap.L().Sugar().Errorf("get block number %s", err)
+							continue
+						}
+						if startBlock.Int64()+100 < int64(latestNumber) {
+							select {
+							case traceTasks <- startBlock:
+							case <-ctx.Done():
+								return ctx.Err()
+							}
+							startBlock = rpc.BlockNumber(startBlock.Int64() + 1)
+						}
+					}
+
+				}
+
+			})
+			eg.Go(func() error {
+				for {
+					select {
+					case <-ctx.Done():
+						return fmt.Errorf("task feeder get error %s", err)
+					case height := <-traceTasks:
+						zap.L().Sugar().Infof("get task at height %d", height)
+						rets, err := debugImpl.TraceSingleBlockRaw(ctx, height, &tracers.TraceConfig{Tracer: &tracerName})
+						if err != nil {
+							return fmt.Errorf("trace block at %d failed %s", height, err)
+						}
+						parquetTasks <- parquetTask{
+							height: height,
+							traces: rets,
+						}
+					}
+				}
+			})
+
+			eg.Go(func() error {
+				for {
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case traces := <-parquetTasks:
+
+						var data = make([]ExportTraceParquet, len(traces.traces))
+						for i := range traces.traces {
+							data[i].setFromPb(&traces.traces[i])
+						}
+
+						filename := fmt.Sprintf("trace_parquet_%d.parquet", traces.height)
+						filePath := filepath.Join(outputDir, filename)
+						tmpfile := filePath + ".tmp"
+						tmpf, err := os.OpenFile(tmpfile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+						if err != nil {
+							return fmt.Errorf("create tmp file %s", err)
+						}
+
+						if err := exportParquetWithData(tmpf, data); err != nil {
+							return fmt.Errorf("export parquet failed %s", err)
+						}
+						if err := tmpf.Close(); err != nil {
+							return fmt.Errorf("close tmp parquet file %s", err)
+						}
+						if err := os.Rename(tmpfile, filePath); err != nil {
+							return fmt.Errorf("rename %s to %s failed: %s", tmpfile, filePath, err)
+						}
+					}
+				}
+			})
+			if err := eg.Wait(); err != nil {
+				zap.L().Sugar().Errorf("stream export parqet get: %s, exit", err)
+			}
+		},
+	}
+
 	exportTxTrace := &cobra.Command{
 		Use: "transaction_trace [start] [end(optional)]",
 		Example: `./rpcdaemon export transaction_trace 122 ( export transaction_trace only on height: 122)
@@ -385,7 +505,7 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 	exportTxTrace.PersistentFlags().BoolVar(&outJsonL, "out-jsonl", true, "save export data as jsonl file")
 	exportTxTrace.PersistentFlags().BoolVar(&outProtobuf, "out-proto", false, "save export data as protobuf serialized file")
 
-	for _, cmd := range []*cobra.Command{exportBlock, exportTx, exportTxTrace, exportBlockParquet} {
+	for _, cmd := range []*cobra.Command{exportBlock, exportTx, exportTxTrace, exportBlockParquet, exportBlockStreamParquet} {
 		cmd.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
 	}
 
@@ -393,6 +513,7 @@ func GetExportCmd(cfg *cli.Flags, rootCancel context.CancelFunc) *cobra.Command 
 	ExportCmd.AddCommand(exportTx)
 	ExportCmd.AddCommand(exportTxTrace)
 	ExportCmd.AddCommand(exportBlockParquet)
+	ExportCmd.AddCommand(exportBlockStreamParquet)
 
 	ExportCmd.PersistentFlags().StringVar(&exportTrace, "runtime-trace", "", "golang process runtime trace")
 	return ExportCmd

@@ -81,6 +81,7 @@ func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
 	e.BlockTimestamp = tx.BlockTimestamp
 	dfs(tx.Stack, "0", &e.Stack)
 }
+
 func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
 	tmpfile := filename + ".tmp"
 	tmpf, err := os.OpenFile(tmpfile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
