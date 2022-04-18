@@ -10,17 +10,18 @@ type ParquetSaver struct {
 	bucket *oss.Bucket
 }
 
-const (
-	ParquetBucketName = "erigon-parquet"
-)
-
 var (
-	objectIdFunc = func(height int64) string {
+	ParquetBucketName = "erigon-parquet"
+	objectIdFunc      = func(height int64) string {
 		return fmt.Sprintf("%d", height)
 	}
 )
 
 func NewParquetSaver(endpoint, accessKeyId, accessKeySecret string) (*ParquetSaver, error) {
+	return newParquetSaver(endpoint, accessKeyId, accessKeySecret)
+}
+
+func newParquetSaver(endpoint, accessKeyId, accessKeySecret string) (*ParquetSaver, error) {
 	client, err := oss.New(endpoint, accessKeyId, accessKeySecret)
 	if err != nil {
 		return nil, err

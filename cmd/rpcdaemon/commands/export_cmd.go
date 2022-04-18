@@ -2,11 +2,13 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
 	"github.com/ledgerwatch/erigon/eth/tracers"
 	"github.com/ledgerwatch/erigon/rpc"
+	"github.com/ledgerwatch/erigon/utils/oss"
 	v3log "github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -32,6 +34,12 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		outJsonL    bool
 		outProtobuf bool
 		outputDir   string
+	)
+
+	var (
+		OSS_ENDPOINT          = ""
+		OSS_ACCESS_KEY_ID     = ""
+		OSS_ACCESS_KEY_SECRET = ""
 	)
 
 	var (
@@ -299,11 +307,41 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		},
 	}
 
-	exportBlockStreamParquetToFile := &cobra.Command{
-		Use:  "stream-parquet",
-		Long: "export block stream to parquet file",
+	saveStreamToFile := func(height int64, outputDir string, data []ExportTraceParquet) error {
+		filename := fmt.Sprintf("trace_parquet_%d.parquet", height)
+		filePath := filepath.Join(outputDir, filename)
+		tmpfile := filePath + ".tmp"
+		tmpf, err := os.OpenFile(tmpfile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+		if err != nil {
+			return fmt.Errorf("create tmp file %s", err)
+		}
 
-		Run: func(cmd *cobra.Command, args []string) {
+		if err := exportParquetWithData(tmpf, data); err != nil {
+			return fmt.Errorf("export parquet failed %s", err)
+		}
+		if err := tmpf.Close(); err != nil {
+			return fmt.Errorf("close tmp parquet file %s", err)
+		}
+		if err := os.Rename(tmpfile, filePath); err != nil {
+			return fmt.Errorf("rename %s to %s failed: %s", tmpfile, filePath, err)
+		}
+		return nil
+	}
+
+	saveStreamToOSS := func(height int64, outputDir string, data []ExportTraceParquet) error {
+		saver, err := oss.NewParquetSaver(OSS_ENDPOINT, OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET)
+		if err != nil {
+			return err
+		}
+		marshal, err := json.Marshal(data)
+		if err != nil {
+			return err
+		}
+		return saver.Save(height, marshal)
+	}
+
+	exportBlockParquetRun := func(saveFunc func(height int64, outputDir string, data []ExportTraceParquet) error) func(cmd *cobra.Command, args []string) {
+		return func(cmd *cobra.Command, args []string) {
 
 			logger := v3log.New()
 
@@ -393,22 +431,8 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 							data[i].setFromPb(&traces.traces[i])
 						}
 
-						filename := fmt.Sprintf("trace_parquet_%d.parquet", traces.height)
-						filePath := filepath.Join(outputDir, filename)
-						tmpfile := filePath + ".tmp"
-						tmpf, err := os.OpenFile(tmpfile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
-						if err != nil {
-							return fmt.Errorf("create tmp file %s", err)
-						}
-
-						if err := exportParquetWithData(tmpf, data); err != nil {
-							return fmt.Errorf("export parquet failed %s", err)
-						}
-						if err := tmpf.Close(); err != nil {
-							return fmt.Errorf("close tmp parquet file %s", err)
-						}
-						if err := os.Rename(tmpfile, filePath); err != nil {
-							return fmt.Errorf("rename %s to %s failed: %s", tmpfile, filePath, err)
+						if err := saveFunc(traces.height.Int64(), outputDir, data); err != nil {
+							return err
 						}
 					}
 				}
@@ -416,7 +440,20 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 			if err := eg.Wait(); err != nil {
 				zap.L().Sugar().Errorf("stream export parqet get: %s, exit", err)
 			}
-		},
+
+		}
+	}
+
+	exportBlockStreamParquetToFile := &cobra.Command{
+		Use:  "stream-parquet",
+		Long: "export block stream to parquet file",
+		Run:  exportBlockParquetRun(saveStreamToFile),
+	}
+
+	exportBlockStreamParquetToOSS := &cobra.Command{
+		Use:  "stream-parquet",
+		Long: "export block stream to OSS",
+		Run:  exportBlockParquetRun(saveStreamToOSS),
 	}
 
 	exportTxTrace := &cobra.Command{
@@ -511,11 +548,27 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		cmd.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
 	}
 
+	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&OSS_ENDPOINT, "oss-endpoint", ".", "oss endpoint")
+	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&OSS_ACCESS_KEY_ID, "oss-access-key-id", ".", "oss access key id")
+	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&OSS_ACCESS_KEY_SECRET, "oss-access-key-secret", ".", "oss access key id secret")
+	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&oss.ParquetBucketName, "oss-bucket-name", "default-erigon-parquet", "oss parquet bucket name")
+
+	if err := exportBlockStreamParquetToOSS.MarkPersistentFlagRequired("oss-endpoint"); err != nil {
+		panic(err)
+	}
+	if err := exportBlockStreamParquetToOSS.MarkPersistentFlagRequired("oss-endpoint-key-id"); err != nil {
+		panic(err)
+	}
+	if err := exportBlockStreamParquetToOSS.MarkPersistentFlagRequired("oss-endpoint-key-secret"); err != nil {
+		panic(err)
+	}
+
 	ExportCmd.AddCommand(exportBlock)
 	ExportCmd.AddCommand(exportTx)
 	ExportCmd.AddCommand(exportTxTrace)
 	ExportCmd.AddCommand(exportBlockParquet)
 	ExportCmd.AddCommand(exportBlockStreamParquetToFile)
+	ExportCmd.AddCommand(exportBlockStreamParquetToOSS)
 
 	ExportCmd.PersistentFlags().StringVar(&exportTrace, "runtime-trace", "", "golang process runtime trace")
 	return ExportCmd
