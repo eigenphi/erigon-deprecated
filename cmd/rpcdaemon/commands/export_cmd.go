@@ -299,8 +299,10 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		},
 	}
 
-	exportBlockStreamParquet := &cobra.Command{
-		Use: "stream-parquet",
+	exportBlockStreamParquetToFile := &cobra.Command{
+		Use:  "stream-parquet",
+		Long: "export block stream to parquet file",
+
 		Run: func(cmd *cobra.Command, args []string) {
 
 			logger := v3log.New()
@@ -326,12 +328,6 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 			tracerName := "opsTracer"
 
 			traceTasks := make(chan rpc.BlockNumber, 10)
-
-			type parquetTask struct {
-				height rpc.BlockNumber
-				traces []protobuf.TraceTransaction
-			}
-			parquetTasks := make(chan parquetTask, 10000)
 
 			eg, ctx := errgroup.WithContext(ctx)
 			eg.Go(func() error {
@@ -360,6 +356,12 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 				}
 
 			})
+
+			type parquetTask struct {
+				height rpc.BlockNumber
+				traces []protobuf.TraceTransaction
+			}
+			parquetTasks := make(chan parquetTask, 10000)
 			eg.Go(func() error {
 				for {
 					select {
@@ -505,7 +507,7 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 	exportTxTrace.PersistentFlags().BoolVar(&outJsonL, "out-jsonl", true, "save export data as jsonl file")
 	exportTxTrace.PersistentFlags().BoolVar(&outProtobuf, "out-proto", false, "save export data as protobuf serialized file")
 
-	for _, cmd := range []*cobra.Command{exportBlock, exportTx, exportTxTrace, exportBlockParquet, exportBlockStreamParquet} {
+	for _, cmd := range []*cobra.Command{exportBlock, exportTx, exportTxTrace, exportBlockParquet, exportBlockStreamParquetToFile} {
 		cmd.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
 	}
 
@@ -513,7 +515,7 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 	ExportCmd.AddCommand(exportTx)
 	ExportCmd.AddCommand(exportTxTrace)
 	ExportCmd.AddCommand(exportBlockParquet)
-	ExportCmd.AddCommand(exportBlockStreamParquet)
+	ExportCmd.AddCommand(exportBlockStreamParquetToFile)
 
 	ExportCmd.PersistentFlags().StringVar(&exportTrace, "runtime-trace", "", "golang process runtime trace")
 	return ExportCmd
