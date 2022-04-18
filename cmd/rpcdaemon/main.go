@@ -24,7 +24,7 @@ func init() {
 func main() {
 	cmd, cfg := cli.RootCommand()
 	rootCtx, rootCancel := utils.RootContext()
-	cmd.AddCommand(commands.GetExportCmd(cfg, rootCancel))
+	cmd.AddCommand(commands.GetExportCmd(cfg, rootCtx, rootCancel))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print the version of rpcdaemon",

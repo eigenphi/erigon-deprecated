@@ -27,17 +27,17 @@ type PlainStackFrame struct {
 }
 
 type ExportTraceParquet struct {
-	BlockNumber      int64             `parquet:"fieldid=0"`
-	TransactionHash  string            `parquet:"fieldid=1,logical=String"`
-	TransactionIndex int32             `parquet:"fieldid=2"`
-	FromAddress      string            `parquet:"fieldid=3,logical=String"`
-	ToAddress        string            `parquet:"fieldid=4,logical=String"`
-	GasPrice         int64             `parquet:"fieldid=5"`
-	Input            string            `parquet:"fieldid=6,logical=String"`
-	Nonce            int64             `parquet:"fieldid=7"`
-	TransactionValue string            `parquet:"fieldid=8,logical=String"`
-	Stack            []PlainStackFrame `parquet:"fieldid=9"`
-	BlockTimestamp   int64             `parquet:"fieldid=10"`
+	BlockNumber      int64             `parquet:"fieldid=0" json:"blockNumber"`
+	TransactionHash  string            `parquet:"fieldid=1,logical=String" json:"transactionHash"`
+	TransactionIndex int32             `parquet:"fieldid=2" json:"transactionIndex"`
+	FromAddress      string            `parquet:"fieldid=3,logical=String" json:"fromAddress"`
+	ToAddress        string            `parquet:"fieldid=4,logical=String" json:"toAddress"`
+	GasPrice         int64             `parquet:"fieldid=5" json:"gasPrice"`
+	Input            string            `parquet:"fieldid=6,logical=String" json:"input"`
+	Nonce            int64             `parquet:"fieldid=7" json:"nonce"`
+	TransactionValue string            `parquet:"fieldid=8,logical=String" json:"transactionValue"`
+	Stack            []PlainStackFrame `parquet:"fieldid=9" json:"stack"`
+	BlockTimestamp   int64             `parquet:"fieldid=10" json:"blockTimestamp"`
 }
 
 func dfs(node *protobuf.StackFrame, prefix string, sks *[]PlainStackFrame) {
@@ -81,6 +81,7 @@ func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
 	e.BlockTimestamp = tx.BlockTimestamp
 	dfs(tx.Stack, "0", &e.Stack)
 }
+
 func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
 	tmpfile := filename + ".tmp"
 	tmpf, err := os.OpenFile(tmpfile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
@@ -127,16 +128,6 @@ func exportParquetWithData(file *os.File, data []ExportTraceParquet) error {
 }
 func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTraceParquet) error {
 	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
-	for i := range sc.Fields() {
-		fmt.Println(i, sc.Field(i).String())
-		if i+2 == len(sc.Fields()) {
-			lt := sc.Field(i).Type.(*arrow.ListType)
-			st := lt.Fields()[0].Type.(*arrow.StructType)
-			for j := range st.Fields() {
-				fmt.Println(j, st.Fields()[j].String())
-			}
-		}
-	}
 	b := array.NewRecordBuilder(mem, sc)
 	defer b.Release()
 
