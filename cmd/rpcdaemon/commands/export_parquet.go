@@ -128,16 +128,6 @@ func exportParquetWithData(file *os.File, data []ExportTraceParquet) error {
 }
 func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTraceParquet) error {
 	mem := memory.NewCheckedAllocator(memory.NewGoAllocator())
-	for i := range sc.Fields() {
-		fmt.Println(i, sc.Field(i).String())
-		if i+2 == len(sc.Fields()) {
-			lt := sc.Field(i).Type.(*arrow.ListType)
-			st := lt.Fields()[0].Type.(*arrow.StructType)
-			for j := range st.Fields() {
-				fmt.Println(j, st.Fields()[j].String())
-			}
-		}
-	}
 	b := array.NewRecordBuilder(mem, sc)
 	defer b.Release()
 

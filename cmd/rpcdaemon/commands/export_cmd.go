@@ -12,7 +12,6 @@ import (
 	v3log "github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"os"
 	"path/filepath"
@@ -308,6 +307,11 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 	}
 
 	saveStreamToFile := func(height int64, outputDir string, data []ExportTraceParquet) error {
+		var err error
+		outputDir, err = filepath.Abs(outputDir)
+		if err != nil {
+			return fmt.Errorf("get realpath: %s", err)
+		}
 		filename := fmt.Sprintf("trace_parquet_%d.parquet", height)
 		filePath := filepath.Join(outputDir, filename)
 		tmpfile := filePath + ".tmp"
@@ -315,16 +319,16 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		if err != nil {
 			return fmt.Errorf("create tmp file %s", err)
 		}
-
+		defer tmpf.Close()
 		if err := exportParquetWithData(tmpf, data); err != nil {
-			return fmt.Errorf("export parquet failed %s", err)
+			return fmt.Errorf("export parquet failed: %s", err)
 		}
-		if err := tmpf.Close(); err != nil {
-			return fmt.Errorf("close tmp parquet file %s", err)
-		}
+		zap.L().Sugar().Infof("export parquet file success on: %d", height)
+
 		if err := os.Rename(tmpfile, filePath); err != nil {
 			return fmt.Errorf("rename %s to %s failed: %s", tmpfile, filePath, err)
 		}
+
 		return nil
 	}
 
@@ -347,6 +351,10 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 
 			var startBlock rpc.BlockNumber
 
+			if err := startBlock.UnmarshalJSON([]byte(args[0])); err != nil {
+				return
+			}
+
 			ctx := cmd.Context()
 			db, eth, txPool, mining, stateCache, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			if err != nil {
@@ -367,64 +375,96 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 
 			traceTasks := make(chan rpc.BlockNumber, 10)
 
-			eg, ctx := errgroup.WithContext(ctx)
-			eg.Go(func() error {
+			eg := sync.WaitGroup{}
+			ethImpl := NewEthAPI(baseApi, db, eth, txPool, mining, cfg.Gascap)
+			checkLatest := func() error {
+				latestNumber, err := ethImpl.BlockNumber(ctx)
+				if err != nil {
+					return err
+				}
+				for {
+					if startBlock.Int64()+30 >= int64(latestNumber) {
+						return nil
+					}
+
+					select {
+					case traceTasks <- startBlock:
+						startBlock = rpc.BlockNumber(startBlock.Int64() + 1)
+					case <-ctx.Done():
+						return err
+					}
+				}
+			}
+			eg.Add(1)
+			go func() {
+				defer eg.Done()
+				defer close(traceTasks)
+
+				if err := checkLatest(); err != nil {
+					zap.L().Sugar().Errorf("check latest block number %s", err)
+					return
+				}
+
 				tk := time.NewTicker(time.Second * 10)
 				for {
 					select {
-					case <-ctx.Done():
-						return ctx.Err()
+					case err := <-ctx.Done():
+						zap.L().Sugar().Errorf("check latest block %s", err)
+						return
 					case <-tk.C:
-						ethImpl := NewEthAPI(baseApi, db, eth, txPool, mining, cfg.Gascap)
-						latestNumber, err := ethImpl.BlockNumber(ctx)
-						if err != nil {
-							zap.L().Sugar().Errorf("get block number %s", err)
-							continue
-						}
-						if startBlock.Int64()+100 < int64(latestNumber) {
-							select {
-							case traceTasks <- startBlock:
-							case <-ctx.Done():
-								return ctx.Err()
-							}
-							startBlock = rpc.BlockNumber(startBlock.Int64() + 1)
+						if err := checkLatest(); err != nil {
+							zap.L().Sugar().Errorf("check latest block number %s", err)
+							return
 						}
 					}
-
 				}
-
-			})
+			}()
 
 			type parquetTask struct {
 				height rpc.BlockNumber
 				traces []protobuf.TraceTransaction
 			}
 			parquetTasks := make(chan parquetTask, 10000)
-			eg.Go(func() error {
-				for {
-					select {
-					case <-ctx.Done():
-						return fmt.Errorf("task feeder get error %s", err)
-					case height := <-traceTasks:
-						zap.L().Sugar().Infof("get task at height %d", height)
+			eg.Add(1)
+			go func() {
+				defer eg.Done()
+				defer close(parquetTasks)
+
+				weighted := semaphore.NewWeighted(5)
+				defer weighted.Acquire(ctx, 5)
+
+				for height := range traceTasks {
+					if err := weighted.Acquire(ctx, 1); err != nil {
+						return
+					}
+					go func(height rpc.BlockNumber) {
+						defer weighted.Release(1)
+
 						rets, err := debugImpl.TraceSingleBlockRaw(ctx, height, &tracers.TraceConfig{Tracer: &tracerName})
 						if err != nil {
-							return fmt.Errorf("trace block at %d failed %s", height, err)
+							zap.L().Sugar().Errorf("trace block %d failed: %s", height, err)
+							return
 						}
 						parquetTasks <- parquetTask{
 							height: height,
 							traces: rets,
 						}
-					}
+					}(height)
 				}
-			})
+			}()
 
-			eg.Go(func() error {
-				for {
-					select {
-					case <-ctx.Done():
-						return ctx.Err()
-					case traces := <-parquetTasks:
+			eg.Add(1)
+			go func() {
+				defer eg.Done()
+				weighted := semaphore.NewWeighted(5)
+				defer weighted.Acquire(ctx, 5)
+
+				for traces := range parquetTasks {
+					if err := weighted.Acquire(ctx, 1); err != nil {
+						return
+					}
+					go func(traces parquetTask) {
+						defer weighted.Release(1)
 
 						var data = make([]ExportTraceParquet, len(traces.traces))
 						for i := range traces.traces {
@@ -432,28 +472,39 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 						}
 
 						if err := saveFunc(traces.height.Int64(), outputDir, data); err != nil {
-							return err
+							zap.L().Sugar().Errorf("save trace block %d failed: %s", traces.height, err)
+							return
 						}
-					}
+					}(traces)
 				}
-			})
-			if err := eg.Wait(); err != nil {
-				zap.L().Sugar().Errorf("stream export parqet get: %s, exit", err)
-			}
-
+			}()
+			eg.Wait()
 		}
 	}
 
 	exportBlockStreamParquetToFile := &cobra.Command{
-		Use:  "stream-parquet",
+		Use:  "stream-parquet-file",
 		Long: "export block stream to parquet file",
 		Run:  exportBlockParquetRun(saveStreamToFile),
 	}
 
 	exportBlockStreamParquetToOSS := &cobra.Command{
-		Use:  "stream-parquet",
+		Use:  "stream-parquet-oss",
 		Long: "export block stream to OSS",
-		Run:  exportBlockParquetRun(saveStreamToOSS),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+
+			if err := cmd.MarkFlagRequired("oss-endpoint"); err != nil {
+				return err
+			}
+			if err := cmd.MarkFlagRequired("oss-endpoint-key-id"); err != nil {
+				return err
+			}
+			if err := cmd.MarkFlagRequired("oss-endpoint-key-secret"); err != nil {
+				return err
+			}
+			return nil
+		},
+		Run: exportBlockParquetRun(saveStreamToOSS),
 	}
 
 	exportTxTrace := &cobra.Command{
@@ -548,20 +599,10 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		cmd.PersistentFlags().StringVar(&outputDir, "out-dir", ".", "save export data to a dir ")
 	}
 
-	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&OSS_ENDPOINT, "oss-endpoint", ".", "oss endpoint")
-	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&OSS_ACCESS_KEY_ID, "oss-access-key-id", ".", "oss access key id")
-	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&OSS_ACCESS_KEY_SECRET, "oss-access-key-secret", ".", "oss access key id secret")
-	exportBlockStreamParquetToOSS.PersistentFlags().StringVar(&oss.ParquetBucketName, "oss-bucket-name", "default-erigon-parquet", "oss parquet bucket name")
-
-	if err := exportBlockStreamParquetToOSS.MarkPersistentFlagRequired("oss-endpoint"); err != nil {
-		panic(err)
-	}
-	if err := exportBlockStreamParquetToOSS.MarkPersistentFlagRequired("oss-endpoint-key-id"); err != nil {
-		panic(err)
-	}
-	if err := exportBlockStreamParquetToOSS.MarkPersistentFlagRequired("oss-endpoint-key-secret"); err != nil {
-		panic(err)
-	}
+	exportBlockStreamParquetToOSS.Flags().StringVar(&OSS_ENDPOINT, "oss-endpoint", "", "oss endpoint")
+	exportBlockStreamParquetToOSS.Flags().StringVar(&OSS_ACCESS_KEY_ID, "oss-access-key-id", "", "oss access key id")
+	exportBlockStreamParquetToOSS.Flags().StringVar(&OSS_ACCESS_KEY_SECRET, "oss-access-key-secret", "", "oss access key id secret")
+	exportBlockStreamParquetToOSS.Flags().StringVar(&oss.ParquetBucketName, "oss-bucket-name", "default-erigon-parquet", "oss parquet bucket name")
 
 	ExportCmd.AddCommand(exportBlock)
 	ExportCmd.AddCommand(exportTx)
