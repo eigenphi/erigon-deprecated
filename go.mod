@@ -6,9 +6,11 @@ require (
 	github.com/RoaringBitmap/roaring v0.9.4
 	github.com/VictoriaMetrics/fastcache v1.7.0
 	github.com/VictoriaMetrics/metrics v1.18.1
+	github.com/aliyun/aliyun-oss-go-sdk v2.2.2+incompatible
 	github.com/anacrolix/log v0.8.0
 	github.com/anacrolix/torrent v1.25.1
 	github.com/apache/arrow/go/v8 v8.0.0-20220316234955-ecf8c753c0e9
+	github.com/baiyubin/aliyun-sts-go-sdk v0.0.0-20180326062324-cfa1a18b161f // indirect
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/c2h5oh/datasize v0.0.0-20200825124411-48ed595a09d2
 	github.com/consensys/gnark-crypto v0.4.1-0.20210426202927-39ac3d4b3f1f
@@ -42,6 +44,7 @@ require (
 	github.com/pelletier/go-toml v1.9.4
 	github.com/quasilyte/go-ruleguard/dsl v0.3.15
 	github.com/rs/cors v1.8.2
+	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/shirou/gopsutil/v3 v3.21.12
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
