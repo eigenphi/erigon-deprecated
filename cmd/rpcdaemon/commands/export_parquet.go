@@ -27,17 +27,17 @@ type PlainStackFrame struct {
 }
 
 type ExportTraceParquet struct {
-	BlockNumber      int64             `parquet:"fieldid=0"`
-	TransactionHash  string            `parquet:"fieldid=1,logical=String"`
-	TransactionIndex int32             `parquet:"fieldid=2"`
-	FromAddress      string            `parquet:"fieldid=3,logical=String"`
-	ToAddress        string            `parquet:"fieldid=4,logical=String"`
-	GasPrice         int64             `parquet:"fieldid=5"`
-	Input            string            `parquet:"fieldid=6,logical=String"`
-	Nonce            int64             `parquet:"fieldid=7"`
-	TransactionValue string            `parquet:"fieldid=8,logical=String"`
-	Stack            []PlainStackFrame `parquet:"fieldid=9"`
-	BlockTimestamp   int64             `parquet:"fieldid=10"`
+	BlockNumber      int64             `parquet:"fieldid=0" json:"blockNumber"`
+	TransactionHash  string            `parquet:"fieldid=1,logical=String" json:"transactionHash"`
+	TransactionIndex int32             `parquet:"fieldid=2" json:"transactionIndex"`
+	FromAddress      string            `parquet:"fieldid=3,logical=String" json:"fromAddress"`
+	ToAddress        string            `parquet:"fieldid=4,logical=String" json:"toAddress"`
+	GasPrice         int64             `parquet:"fieldid=5" json:"gasPrice"`
+	Input            string            `parquet:"fieldid=6,logical=String" json:"input"`
+	Nonce            int64             `parquet:"fieldid=7" json:"nonce"`
+	TransactionValue string            `parquet:"fieldid=8,logical=String" json:"transactionValue"`
+	Stack            []PlainStackFrame `parquet:"fieldid=9" json:"stack"`
+	BlockTimestamp   int64             `parquet:"fieldid=10" json:"blockTimestamp"`
 }
 
 func dfs(node *protobuf.StackFrame, prefix string, sks *[]PlainStackFrame) {

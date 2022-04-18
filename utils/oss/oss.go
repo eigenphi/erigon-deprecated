@@ -11,7 +11,7 @@ type ParquetSaver struct {
 }
 
 var (
-	ParquetBucketName = "erigon-parquet"
+	ParquetBucketName = "default-erigon-parquet"
 	objectIdFunc      = func(height int64) string {
 		return fmt.Sprintf("%d", height)
 	}
@@ -28,7 +28,7 @@ func newParquetSaver(endpoint, accessKeyId, accessKeySecret string) (*ParquetSav
 	}
 	bucket, err := client.Bucket(ParquetBucketName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get bucket %s: %v", ParquetBucketName, err)
 	}
 	return &ParquetSaver{
 		bucket: bucket,
@@ -36,5 +36,8 @@ func newParquetSaver(endpoint, accessKeyId, accessKeySecret string) (*ParquetSav
 }
 
 func (p *ParquetSaver) Save(heihgt int64, data []byte) error {
-	return p.bucket.PutObject(objectIdFunc(heihgt), bytes.NewReader(data))
+	if err := p.bucket.PutObject(objectIdFunc(heihgt), bytes.NewReader(data)); err != nil {
+		return err
+	}
+	return nil
 }

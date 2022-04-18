@@ -341,7 +341,11 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		if err != nil {
 			return err
 		}
-		return saver.Save(height, marshal)
+		if err := saver.Save(height, marshal); err != nil {
+			return err
+		}
+		zap.L().Sugar().Infof("export parquet file to oss success on: %d", height)
+		return nil
 	}
 
 	exportBlockParquetRun := func(saveFunc func(height int64, outputDir string, data []ExportTraceParquet) error) func(cmd *cobra.Command, args []string) {
@@ -496,10 +500,10 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 			if err := cmd.MarkFlagRequired("oss-endpoint"); err != nil {
 				return err
 			}
-			if err := cmd.MarkFlagRequired("oss-endpoint-key-id"); err != nil {
+			if err := cmd.MarkFlagRequired("oss-access-key-id"); err != nil {
 				return err
 			}
-			if err := cmd.MarkFlagRequired("oss-endpoint-key-secret"); err != nil {
+			if err := cmd.MarkFlagRequired("oss-access-key-secret"); err != nil {
 				return err
 			}
 			return nil
@@ -602,7 +606,7 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 	exportBlockStreamParquetToOSS.Flags().StringVar(&OSS_ENDPOINT, "oss-endpoint", "", "oss endpoint")
 	exportBlockStreamParquetToOSS.Flags().StringVar(&OSS_ACCESS_KEY_ID, "oss-access-key-id", "", "oss access key id")
 	exportBlockStreamParquetToOSS.Flags().StringVar(&OSS_ACCESS_KEY_SECRET, "oss-access-key-secret", "", "oss access key id secret")
-	exportBlockStreamParquetToOSS.Flags().StringVar(&oss.ParquetBucketName, "oss-bucket-name", "default-erigon-parquet", "oss parquet bucket name")
+	exportBlockStreamParquetToOSS.Flags().StringVar(&oss.ParquetBucketName, "oss-bucket-name", oss.ParquetBucketName, "oss parquet bucket name")
 
 	ExportCmd.AddCommand(exportBlock)
 	ExportCmd.AddCommand(exportTx)
