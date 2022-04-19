@@ -1,8 +1,8 @@
 package commands
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
@@ -337,11 +337,14 @@ func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.Cancel
 		if err != nil {
 			return err
 		}
-		marshal, err := json.Marshal(data)
-		if err != nil {
-			return err
+		bs := make([]byte, 0)
+		buffer := bytes.NewBuffer(bs)
+
+		if err := exportParquetWithData(buffer, data); err != nil {
+			return fmt.Errorf("export parquet failed: %s", err)
 		}
-		if err := saver.Save(height, marshal); err != nil {
+
+		if err := saver.Save(height, buffer); err != nil {
 			return err
 		}
 		zap.L().Sugar().Infof("export parquet file to oss success on: %d", height)

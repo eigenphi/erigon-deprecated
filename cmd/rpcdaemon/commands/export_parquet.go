@@ -10,6 +10,7 @@ import (
 	"github.com/apache/arrow/go/v8/parquet/pqarrow"
 	"github.com/apache/arrow/go/v8/parquet/schema"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
+	"io"
 	"os"
 )
 
@@ -101,7 +102,7 @@ func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
 	return os.Rename(tmpfile, filename)
 }
 
-func exportParquetWithData(file *os.File, data []ExportTraceParquet) error {
+func exportParquetWithData(writer io.Writer, data []ExportTraceParquet) error {
 
 	psc, err := schema.NewSchemaFromStruct(&ExportTraceParquet{})
 	if err != nil {
@@ -113,7 +114,7 @@ func exportParquetWithData(file *os.File, data []ExportTraceParquet) error {
 		return fmt.Errorf("failed to create array schema from schema: %v", err)
 	}
 
-	wr, err := pqarrow.NewFileWriter(sc, file, parquet.NewWriterProperties(parquet.WithCompression(compress.Codecs.Zstd),
+	wr, err := pqarrow.NewFileWriter(sc, writer, parquet.NewWriterProperties(parquet.WithCompression(compress.Codecs.Zstd),
 		parquet.WithDictionaryDefault(true),
 		parquet.WithDataPageSize(100*1024),
 	),

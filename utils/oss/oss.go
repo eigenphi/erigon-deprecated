@@ -1,9 +1,9 @@
 package oss
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"io"
 )
 
 type ParquetSaver struct {
@@ -35,8 +35,8 @@ func newParquetSaver(endpoint, accessKeyId, accessKeySecret string) (*ParquetSav
 	}, nil
 }
 
-func (p *ParquetSaver) Save(heihgt int64, data []byte) error {
-	if err := p.bucket.PutObject(objectIdFunc(heihgt), bytes.NewReader(data)); err != nil {
+func (p *ParquetSaver) Save(heihgt int64, reader io.Reader) error {
+	if err := p.bucket.PutObject(objectIdFunc(heihgt), reader); err != nil {
 		return err
 	}
 	return nil
