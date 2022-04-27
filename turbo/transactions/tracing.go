@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/ledgerwatch/erigon/eth/tracers/native"
 	"math/big"
 	"sort"
 	"time"
@@ -80,54 +79,6 @@ func ComputeTxEnv(ctx context.Context, block *types.Block, cfg *params.ChainConf
 // TraceTx configures a new tracer according to the provided configuration, and
 // executes the given message in the provided environment. The return value will
 // be tracer dependent.
-func TraceTxByOpsTracer(
-	ctx context.Context,
-	message core.Message,
-	blockCtx vm.BlockContext,
-	txCtx vm.TxContext,
-	ibs vm.IntraBlockState,
-	config *tracers.TraceConfig,
-	chainConfig *params.ChainConfig,
-) (*native.OpsCallFrame, error) {
-	// Assemble the structured logger or the JavaScript tracer
-	var (
-		tracer = native.NewOpsTracer()
-		err    error
-	)
-
-	timeout := callTimeout
-	if config.Timeout != nil {
-		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
-			return nil, err
-		}
-	}
-
-	deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
-	go func() {
-		<-deadlineCtx.Done()
-		if t, ok := tracer.(*tracers.Tracer); ok {
-			t.Stop(errors.New("execution timeout"))
-		}
-	}()
-	defer cancel()
-
-	vmenv := vm.NewEVM(blockCtx, txCtx, ibs, chainConfig, vm.Config{Debug: true, Tracer: tracer})
-	var refunds = true
-	if config != nil && config.NoRefunds != nil && *config.NoRefunds {
-		refunds = false
-	}
-	core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()), refunds, false)
-
-	t, ok := tracer.(*native.OpsTracer)
-	if !ok {
-		return nil, fmt.Errorf("tracer is not OpsTracer")
-	}
-	return t.GetCallStack(), nil
-}
-
-// TraceTx configures a new tracer according to the provided configuration, and
-// executes the given message in the provided environment. The return value will
-// be tracer dependent.
 func TraceTx(
 	ctx context.Context,
 	message core.Message,
@@ -154,22 +105,16 @@ func TraceTx(
 				return err
 			}
 		}
-		// Construct the JavaScript tracer to execute with
-		tracer = native.NewOpsTracer()
-		//if tracer, err = tracers.New(*config.Tracer, &tracers.Context{
-		//	TxHash: txCtx.TxHash,
-		//}); err != nil {
-		//	stream.WriteNil()
-		//	return err
-		//}
-
+		// Constuct the JavaScript tracer to execute with
+		if tracer, err = tracers.New(*config.Tracer, txCtx); err != nil {
+			stream.WriteNil()
+			return err
+		}
 		// Handle timeouts and RPC cancellations
 		deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
 		go func() {
 			<-deadlineCtx.Done()
-			if t, ok := tracer.(*tracers.Tracer); ok {
-				t.Stop(errors.New("execution timeout"))
-			}
+			tracer.(*tracers.Tracer).Stop(errors.New("execution timeout"))
 		}()
 		defer cancel()
 		streaming = false
@@ -184,7 +129,8 @@ func TraceTx(
 	}
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(blockCtx, txCtx, ibs, chainConfig, vm.Config{Debug: true, Tracer: tracer})
-	var refunds = true
+
+	var refunds bool = true
 	if config != nil && config.NoRefunds != nil && *config.NoRefunds {
 		refunds = false
 	}
@@ -220,10 +166,7 @@ func TraceTx(
 		stream.WriteString(returnVal)
 		stream.WriteObjectEnd()
 	} else {
-		if t, ok := tracer.(*native.OpsTracer); ok {
-			result, _ := t.GetResult()
-			stream.Write(result)
-		} else if r, err1 := tracer.(*tracers.Tracer).GetResult(); err1 == nil {
+		if r, err1 := tracer.(*tracers.Tracer).GetResult(); err1 == nil {
 			stream.Write(r)
 		} else {
 			return err1

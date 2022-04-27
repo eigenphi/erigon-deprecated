@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/jsonpb"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/consensus/ethash"
 	"github.com/ledgerwatch/erigon/core/rawdb"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
+	"github.com/ledgerwatch/erigon/eigenphi/opstrace"
+	"github.com/ledgerwatch/erigon/eigenphi/pb/go/protobuf"
 	"github.com/ledgerwatch/erigon/eth/tracers"
-	"github.com/ledgerwatch/erigon/eth/tracers/native"
 	"github.com/ledgerwatch/erigon/ethdb"
 	"github.com/ledgerwatch/erigon/rpc"
 	"github.com/ledgerwatch/erigon/turbo/transactions"
@@ -71,7 +71,7 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 	}
 	// Trace the transaction and return
 	config := &tracers.TraceConfig{}
-	tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
 	if err != nil {
 		stream.WriteNil()
 		return err
@@ -143,7 +143,7 @@ func (api *PrivateDebugAPIImpl) EigenphiPlainTraceByTxHash(ctx context.Context, 
 	}
 	// Trace the transaction and return
 	config := &tracers.TraceConfig{}
-	tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
 	if err != nil {
 		stream.WriteNil()
 		return err
@@ -194,7 +194,7 @@ func (api *PrivateDebugAPIImpl) EigenphiPlainTraceByNumber(ctx context.Context, 
 
 type TxOpsTracer struct {
 	Hash  common.Hash
-	trace native.OpsCallFrame
+	trace trace.OpsCallFrame
 }
 
 func (api *PrivateDebugAPIImpl) getSimpleBlock(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
@@ -306,7 +306,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlockRaw(ctx context.Context, blockNr
 			GasPrice: msg.GasPrice().ToBig(),
 		}
 
-		tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+		tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
 		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
 		if err != nil {
 			// TODO handle trace transaction error
@@ -375,7 +375,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 			GasPrice: msg.GasPrice().ToBig(),
 		}
 
-		tracerResult, err := transactions.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+		tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
 		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
 		if err != nil {
 			// TODO handle trace transaction error
@@ -429,7 +429,7 @@ func toPbSimpleTransaction(rtx *RPCTransaction, tx types.Transaction, blkTs uint
 	}
 }
 
-func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.OpsCallFrame, blockTimestamp int64) protobuf.TraceTransaction {
+func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *trace.OpsCallFrame, blockTimestamp int64) protobuf.TraceTransaction {
 	var to string
 	if rtx.To != nil {
 		to = strings.ToLower(rtx.To.String())
@@ -449,7 +449,7 @@ func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *native.
 	}
 }
 
-func toPbCallTrace(in *native.OpsCallFrame) *protobuf.StackFrame {
+func toPbCallTrace(in *trace.OpsCallFrame) *protobuf.StackFrame {
 	if in == nil {
 		return &protobuf.StackFrame{}
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/apache/arrow/go/v8/parquet/compress"
 	"github.com/apache/arrow/go/v8/parquet/pqarrow"
 	"github.com/apache/arrow/go/v8/parquet/schema"
-	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
+	"github.com/ledgerwatch/erigon/eigenphi/pb/go/protobuf"
 	"io"
 	"os"
 )

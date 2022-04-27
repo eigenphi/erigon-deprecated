@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package native
+package trace
 
 import (
 	"encoding/hex"
@@ -22,7 +22,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon/core/vm/stack"
 	"github.com/ledgerwatch/erigon/crypto"
-	"github.com/ledgerwatch/erigon/utils/fourbyte"
+	"github.com/ledgerwatch/erigon/eigenphi/utils/fourbyte"
 	"math/big"
 	"strconv"
 	"strings"
@@ -53,6 +53,8 @@ type OpsCallFrame struct {
 	code            []byte          `json:"-"` // for calculating CREATE2 contract address
 	salt            *uint256.Int    `json:"-"` // for calculating CREATE2 contract address
 }
+
+var _ vm.Tracer = (*OpsTracer)(nil)
 
 type OpsTracer struct {
 	callstack    OpsCallFrame
@@ -204,7 +206,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			topic3 = stack.Back(5).String()[2:] // remove "0x" prefix
 			logInput = strings.Join([]string{topic0, topic1, topic2, topic3}, " ")
 		}
-		var label string = t.getLabel(topic0)
+		var label = t.getLabel(topic0)
 		frame := OpsCallFrame{
 			Type:    op.String(),
 			Label:   label,

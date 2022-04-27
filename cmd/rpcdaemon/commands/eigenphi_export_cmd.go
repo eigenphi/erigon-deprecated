@@ -5,10 +5,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/cli"
-	"github.com/ledgerwatch/erigon/cmd/rpcdaemon/pb/go/protobuf"
+	"github.com/ledgerwatch/erigon/eigenphi/pb/go/protobuf"
+	"github.com/ledgerwatch/erigon/eigenphi/utils/oss"
 	"github.com/ledgerwatch/erigon/eth/tracers"
 	"github.com/ledgerwatch/erigon/rpc"
-	"github.com/ledgerwatch/erigon/utils/oss"
 	v3log "github.com/ledgerwatch/log/v3"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -23,9 +23,6 @@ import (
 
 var ExportCmd = &cobra.Command{
 	Use: "export",
-}
-
-func init() {
 }
 
 func GetExportCmd(cfg *cli.Flags, ctx context.Context, rootCancel context.CancelFunc) *cobra.Command {
