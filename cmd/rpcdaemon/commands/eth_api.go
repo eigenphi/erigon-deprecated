@@ -96,6 +96,8 @@ type EthAPI interface {
 	CompileLLL(_ context.Context, _ string) (hexutil.Bytes, error)
 	CompileSolidity(ctx context.Context, _ string) (hexutil.Bytes, error)
 	CompileSerpent(ctx context.Context, _ string) (hexutil.Bytes, error)
+
+	GetTransactionReceiptsByBlockNumber(ctx context.Context, blockNumber rpc.BlockNumber) ([]map[string]interface{}, error)
 }
 
 type BaseAPI struct {
