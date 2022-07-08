@@ -126,6 +126,7 @@ func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64
 	t.currentFrame.GasCost = uintToHex(startGas - endGas)
 	if err != nil {
 		t.currentFrame.Error = err.Error()
+		t.currentFrame.Calls = []*OpsCallFrame{}
 	}
 
 	t.currentFrame = t.currentFrame.parent
