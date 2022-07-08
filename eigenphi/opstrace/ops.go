@@ -19,6 +19,7 @@ package trace
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/holiman/uint256"
 	"github.com/ledgerwatch/erigon/core/vm/stack"
@@ -62,7 +63,6 @@ type OpsTracer struct {
 	currentDepth int
 	currentFrame *OpsCallFrame
 	interrupt    uint32 // Atomic flag to signal execution interruption
-	reason       error  // Textual reason for the interruption
 	initialized  bool
 }
 
@@ -171,9 +171,11 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 	contract := scope.Contract
 	memory := scope.Memory
 	if err != nil {
-		t.reason = err
 		if t.currentFrame != nil {
 			t.currentFrame.Error = err.Error()
+			t.currentFrame.Calls = []*OpsCallFrame{}
+			t.currentFrame = t.currentFrame.parent
+			t.currentDepth -= 1
 		}
 		return
 	}
@@ -333,23 +335,23 @@ func (t *OpsTracer) GetResult() (json.RawMessage, error) {
 	if len(t.callstack.Error) != 0 {
 		t.callstack.Calls = []*OpsCallFrame{}
 	}
-	if t.reason != nil {
-		t.callstack.Error = t.reason.Error()
+	errString := t.callstack.Error
+	if len(errString) > 0 {
 		t.callstack.Calls = []*OpsCallFrame{}
 	}
 	res, err := json.Marshal(t.callstack)
 	if err != nil {
 		return nil, err
 	}
-	return json.RawMessage(res), t.reason
+	return json.RawMessage(res), errors.New(errString)
 }
 
 func (t *OpsTracer) GetCallStack() *OpsCallFrame {
 	if len(t.callstack.Error) != 0 {
 		t.callstack.Calls = []*OpsCallFrame{}
 	}
-	if t.reason != nil {
-		t.callstack.Error = t.reason.Error()
+	errString := t.callstack.Error
+	if len(errString) > 0 {
 		t.callstack.Calls = []*OpsCallFrame{}
 	}
 	return &t.callstack
