@@ -17,6 +17,7 @@
 package vm
 
 import (
+	"fmt"
 	"hash"
 	"sync/atomic"
 
@@ -275,6 +276,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		// Static portion of gas
 		cost = operation.constantGas // For tracing
 		if !contract.UseGas(operation.constantGas) {
+			fmt.Println("use constant gas failed", contract.Gas, operation.constantGas)
 			return nil, ErrOutOfGas
 		}
 
@@ -302,6 +304,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			dynamicCost, err = operation.dynamicGas(in.evm, contract, locStack, mem, memorySize)
 			cost += dynamicCost // total cost, for debug tracing
 			if err != nil || !contract.UseGas(dynamicCost) {
+				fmt.Println("use dynamic gas failed", contract.Gas, dynamicCost)
 				return nil, ErrOutOfGas
 			}
 		}

@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/holiman/uint256"
@@ -174,6 +175,7 @@ func ActivePrecompiles(rules *params.Rules) []common.Address {
 func RunPrecompiledContract(p PrecompiledContract, input []byte, suppliedGas uint64) (ret []byte, remainingGas uint64, err error) {
 	gasCost := p.RequiredGas(input)
 	if suppliedGas < gasCost {
+		fmt.Println("run pre-compiled contract out of gas", suppliedGas, gasCost)
 		return nil, 0, ErrOutOfGas
 	}
 	suppliedGas -= gasCost
