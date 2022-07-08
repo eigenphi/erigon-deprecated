@@ -166,7 +166,7 @@ func (t *OpsTracer) getLabel(topic0 string) string {
 //func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *stack.Stack, rData []byte, contract *vm.Contract, depth int, err error) error {
 
 func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
-	fmt.Println("CaptureState", op.String(), depth, t.currentDepth, gas, cost)
+	fmt.Println("CaptureState", op.String(), depth, t.currentDepth, gas, cost, err)
 	stack := scope.Stack
 	contract := scope.Contract
 	memory := scope.Memory
