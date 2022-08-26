@@ -78,7 +78,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			_, _ = bordb, starknet
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
@@ -87,7 +87,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			_, _, _ = eth, txPool, mining
 			defer db.Close()
 
-			base := NewBaseApi(ff, stateCache, blockReader, cfg.WithDatadir)
+			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}
@@ -159,7 +159,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 
 			ctx := cmd.Context()
 
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			_, _ = bordb, starknet
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
@@ -168,7 +168,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			_, _, _ = eth, txPool, mining
 			defer db.Close()
 
-			base := NewBaseApi(ff, stateCache, blockReader, cfg.WithDatadir)
+			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}
@@ -226,7 +226,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			_, _ = bordb, starknet
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
@@ -235,7 +235,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			_, _, _ = eth, txPool, mining
 			defer db.Close()
 
-			base := NewBaseApi(ff, stateCache, blockReader, cfg.WithDatadir)
+			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}
@@ -366,7 +366,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			_, _ = bordb, starknet
 
 			if err != nil {
@@ -376,7 +376,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			_, _, _ = eth, txPool, mining
 			defer db.Close()
 
-			baseApi := NewBaseApi(ff, stateCache, blockReader, cfg.WithDatadir)
+			baseApi := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
 			if cfg.TevmEnabled {
 				baseApi.EnableTevmExperiment()
 			}
@@ -552,7 +552,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
 			_, _ = bordb, starknet
 
 			if err != nil {
@@ -564,7 +564,7 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			_ = mining
 			defer db.Close()
 
-			base := NewBaseApi(ff, stateCache, blockReader, cfg.WithDatadir)
+			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
 			if cfg.TevmEnabled {
 				base.EnableTevmExperiment()
 			}
