@@ -78,8 +78,8 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
-			_, _ = bordb, starknet
+			db, bordb, eth, txPool, mining, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			_ = bordb
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
 				os.Exit(1)
@@ -88,9 +88,6 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			defer db.Close()
 
 			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
-			if cfg.TevmEnabled {
-				base.EnableTevmExperiment()
-			}
 			//ethImpl := NewEthAPI(base, db, eth, txPool, mining, cfg.Gascap)
 
 			filename := fmt.Sprintf("block_%d", startBlock)
@@ -159,8 +156,8 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 
 			ctx := cmd.Context()
 
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
-			_, _ = bordb, starknet
+			db, bordb, eth, txPool, mining, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			_ = bordb
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
 				os.Exit(1)
@@ -169,9 +166,6 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			defer db.Close()
 
 			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
-			if cfg.TevmEnabled {
-				base.EnableTevmExperiment()
-			}
 			//ethImpl := NewEthAPI(base, db, eth, txPool, mining, cfg.Gascap)
 
 			filename := fmt.Sprintf("simple_transaction_%d", startBlock)
@@ -226,8 +220,8 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
-			_, _ = bordb, starknet
+			db, bordb, eth, txPool, mining, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			_ = bordb
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
 				os.Exit(1)
@@ -236,9 +230,6 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			defer db.Close()
 
 			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
-			if cfg.TevmEnabled {
-				base.EnableTevmExperiment()
-			}
 			ethImpl := NewEthAPI(base, db, eth, txPool, mining, cfg.Gascap)
 
 			filename := fmt.Sprintf("trace_parquet_%d", startBlock)
@@ -366,8 +357,8 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
-			_, _ = bordb, starknet
+			db, bordb, eth, txPool, mining, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			_ = bordb
 
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
@@ -377,9 +368,6 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			defer db.Close()
 
 			baseApi := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
-			if cfg.TevmEnabled {
-				baseApi.EnableTevmExperiment()
-			}
 
 			debugImpl := NewPrivateDebugAPI(baseApi, db, cfg.Gascap)
 
@@ -552,8 +540,8 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			}
 
 			ctx := cmd.Context()
-			db, bordb, eth, txPool, mining, starknet, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
-			_, _ = bordb, starknet
+			db, bordb, eth, txPool, mining, stateCache, blockReader, ff, agg, txNums, err := cli.RemoteServices(ctx, *cfg, logger, rootCancel)
+			_ = bordb
 
 			if err != nil {
 				zlog.Errorf("Could not connect to DB: %s", err)
@@ -565,9 +553,6 @@ func GetExportCmd(cfg *httpcfg.HttpCfg, ctx context.Context, rootCancel context.
 			defer db.Close()
 
 			base := NewBaseApi(ff, stateCache, blockReader, agg, txNums, false)
-			if cfg.TevmEnabled {
-				base.EnableTevmExperiment()
-			}
 			//ethImpl := NewEthAPI(base, db, eth, txPool, mining, cfg.Gascap)
 
 			filename := fmt.Sprintf("transaction_trace_%d", startBlock)
