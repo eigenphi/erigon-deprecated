@@ -32,6 +32,41 @@ import (
 	"github.com/ledgerwatch/erigon/turbo/transactions"
 )
 
+func getReceipts(ctx context.Context, tx kv.Tx, chainConfig *params.ChainConfig, block *types.Block, senders []common.Address) (types.Receipts, error) {
+	if cached := rawdb.ReadReceipts(tx, block, senders); cached != nil {
+		return cached, nil
+	}
+
+	getHeader := func(hash common.Hash, number uint64) *types.Header {
+		return rawdb.ReadHeader(tx, hash, number)
+	}
+	_, _, _, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), 0)
+	if err != nil {
+		return nil, err
+	}
+
+	usedGas := new(uint64)
+	gp := new(core.GasPool).AddGas(block.GasLimit())
+
+	ethashFaker := ethash.NewFaker()
+	noopWriter := state.NewNoopWriter()
+
+	receipts := make(types.Receipts, len(block.Transactions()))
+
+	for i, txn := range block.Transactions() {
+		ibs.Prepare(txn.Hash(), block.Hash(), i)
+		header := block.Header()
+		receipt, _, err := core.ApplyTransaction(chainConfig, core.GetHashFn(header, getHeader), ethashFaker, nil, gp, ibs, noopWriter, block.Header(), txn, usedGas, vm.Config{})
+		if err != nil {
+			return nil, err
+		}
+		receipt.BlockHash = block.Hash()
+		receipts[i] = receipt
+	}
+
+	return receipts, nil
+}
+
 func (api *BaseAPI) getReceipts(ctx context.Context, tx kv.Tx, chainConfig *params.ChainConfig, block *types.Block, senders []common.Address) (types.Receipts, error) {
 	if cached := rawdb.ReadReceipts(tx, block, senders); cached != nil {
 		return cached, nil
