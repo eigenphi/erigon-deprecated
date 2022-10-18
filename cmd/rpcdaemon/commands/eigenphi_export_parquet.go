@@ -25,6 +25,7 @@ type PlainStackFrame struct {
 	Input           string `parquet:"fieldid=7,logical=String" json:"input"`
 	Error           string `parquet:"fieldid=8,logical=String" json:"error"`
 	ChildrenCount   int32  `parquet:"fieldid=9" json:"childrenCount"`
+	FourBytes       string `parquet:"fieldid=10" json:"fourBytes"`
 }
 
 type ExportTraceParquet struct {
@@ -56,6 +57,7 @@ func dfs(node *protobuf.StackFrame, prefix string, sks *[]PlainStackFrame) {
 		Input:           node.Input,
 		Error:           node.Error,
 		ChildrenCount:   int32(len(node.GetCalls())),
+		FourBytes:       node.FourBytes,
 	})
 	for i, call := range node.GetCalls() {
 		cPrefix := fmt.Sprintf("%s_%d", prefix, i)
