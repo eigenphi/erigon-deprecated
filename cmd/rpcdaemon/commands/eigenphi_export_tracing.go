@@ -456,6 +456,7 @@ func toPbCallTrace(in *trace.OpsCallFrame) *protobuf.StackFrame {
 		Input:           in.Input,
 		Error:           in.Error,
 		Calls:           calls,
+		FourBytes:       in.FourBytes,
 	}
 
 }

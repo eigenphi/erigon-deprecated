@@ -142,4 +142,16 @@ public interface stackFrameOrBuilder extends
    */
   io.eigenphi.erigon.protos.stackFrameOrBuilder getCallsOrBuilder(
       int index);
+
+  /**
+   * <code>string fourBytes = 10;</code>
+   * @return The fourBytes.
+   */
+  java.lang.String getFourBytes();
+  /**
+   * <code>string fourBytes = 10;</code>
+   * @return The bytes for fourBytes.
+   */
+  com.google.protobuf.ByteString
+      getFourBytesBytes();
 }
