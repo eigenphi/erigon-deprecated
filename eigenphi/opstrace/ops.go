@@ -100,11 +100,12 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from common.Address, to
 		return
 	}
 	t.callstack = OpsCallFrame{
-		Type:  "CALL",
-		From:  addrToHex(from),
-		To:    addrToHex(to),
-		GasIn: uintToHex(gas),
-		Value: bigToHex(value),
+		Type:      "CALL",
+		From:      addrToHex(from),
+		To:        addrToHex(to),
+		GasIn:     uintToHex(gas),
+		Value:     bigToHex(value),
+		FourBytes: getInputFourBytes(input),
 	}
 	if create {
 		t.callstack.Type = "CREATE"
@@ -163,11 +164,11 @@ func (t *OpsTracer) getLabel(topic0 string) string {
 	return label
 }
 
-func getInputFourBytes(contract *vm.Contract) string {
-	if len(contract.Input) < 4 {
+func getInputFourBytes(input []byte) string {
+	if len(input) < 4 {
 		return ""
 	}
-	return hex.EncodeToString(contract.Input[:4])
+	return hex.EncodeToString(input[:4])
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
@@ -292,7 +293,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:     uintToHex(gas),
 			GasCost:   uintToHex(cost),
 			parent:    t.currentFrame,
-			FourBytes: getInputFourBytes(contract),
+			FourBytes: getInputFourBytes(contract.Input),
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
@@ -313,7 +314,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:     uintToHex(gas),
 			GasCost:   uintToHex(cost),
 			parent:    t.currentFrame,
-			FourBytes: getInputFourBytes(contract),
+			FourBytes: getInputFourBytes(contract.Input),
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
