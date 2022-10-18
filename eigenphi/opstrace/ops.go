@@ -53,6 +53,7 @@ type OpsCallFrame struct {
 	parent          *OpsCallFrame   `json:"-"`
 	code            []byte          `json:"-"` // for calculating CREATE2 contract address
 	salt            *uint256.Int    `json:"-"` // for calculating CREATE2 contract address
+	FourBytes       string          `json:"four_bytes,omitempty"`
 }
 
 var _ vm.Tracer = (*OpsTracer)(nil)
@@ -160,6 +161,13 @@ func (t *OpsTracer) getLabel(topic0 string) string {
 	label, _ := labelDb.Selector(topic0Bs)
 	//}
 	return label
+}
+
+func getInputFourBytes(contract *vm.Contract) string {
+	if len(contract.Input) < 4 {
+		return ""
+	}
+	return hex.EncodeToString(contract.Input[:4])
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
@@ -277,13 +285,14 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		value := stack.Back(2)
 		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(contract.Address().String()),
-			To:      strings.ToLower(to.String()),
-			Value:   value.String(),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			parent:  t.currentFrame,
+			Type:      op.String(),
+			From:      strings.ToLower(contract.Address().String()),
+			To:        strings.ToLower(to.String()),
+			Value:     value.String(),
+			GasIn:     uintToHex(gas),
+			GasCost:   uintToHex(cost),
+			parent:    t.currentFrame,
+			FourBytes: getInputFourBytes(contract),
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
@@ -298,12 +307,13 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 
 		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(contract.Address().String()),
-			To:      strings.ToLower(to.String()),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			parent:  t.currentFrame,
+			Type:      op.String(),
+			From:      strings.ToLower(contract.Address().String()),
+			To:        strings.ToLower(to.String()),
+			GasIn:     uintToHex(gas),
+			GasCost:   uintToHex(cost),
+			parent:    t.currentFrame,
+			FourBytes: getInputFourBytes(contract),
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
