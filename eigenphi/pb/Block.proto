@@ -17,6 +17,7 @@ message  stackFrame {
   string input = 7;
   string error = 8;
   repeated stackFrame calls = 9;
+  string fourBytes = 10;
 }
 
 message InternalTxn {

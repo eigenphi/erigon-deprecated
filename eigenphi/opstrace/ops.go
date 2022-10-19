@@ -53,6 +53,7 @@ type OpsCallFrame struct {
 	parent          *OpsCallFrame   `json:"-"`
 	code            []byte          `json:"-"` // for calculating CREATE2 contract address
 	salt            *uint256.Int    `json:"-"` // for calculating CREATE2 contract address
+	FourBytes       string          `json:"four_bytes"`
 }
 
 var _ vm.Tracer = (*OpsTracer)(nil)
@@ -99,11 +100,12 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from common.Address, to
 		return
 	}
 	t.callstack = OpsCallFrame{
-		Type:  "CALL",
-		From:  addrToHex(from),
-		To:    addrToHex(to),
-		GasIn: uintToHex(gas),
-		Value: bigToHex(value),
+		Type:      "CALL",
+		From:      addrToHex(from),
+		To:        addrToHex(to),
+		GasIn:     uintToHex(gas),
+		Value:     bigToHex(value),
+		FourBytes: getInputFourBytes(input),
 	}
 	if create {
 		t.callstack.Type = "CREATE"
@@ -115,8 +117,8 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from common.Address, to
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
-//func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) error {
-//fmt.Println("CaptureEnd", depth, t.currentDepth, err)
+// func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) error {
+// fmt.Println("CaptureEnd", depth, t.currentDepth, err)
 // precompiled calls don't have a callframe
 func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) {
 	if depth == t.currentDepth {
@@ -160,6 +162,13 @@ func (t *OpsTracer) getLabel(topic0 string) string {
 	label, _ := labelDb.Selector(topic0Bs)
 	//}
 	return label
+}
+
+func getInputFourBytes(input []byte) string {
+	if len(input) < 4 {
+		return ""
+	}
+	return hex.EncodeToString(input[:4])
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
@@ -277,13 +286,14 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		value := stack.Back(2)
 		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(contract.Address().String()),
-			To:      strings.ToLower(to.String()),
-			Value:   value.String(),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			parent:  t.currentFrame,
+			Type:      op.String(),
+			From:      strings.ToLower(contract.Address().String()),
+			To:        strings.ToLower(to.String()),
+			Value:     value.String(),
+			GasIn:     uintToHex(gas),
+			GasCost:   uintToHex(cost),
+			parent:    t.currentFrame,
+			FourBytes: getInputFourBytes(contract.Input),
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
@@ -298,12 +308,13 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 
 		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(contract.Address().String()),
-			To:      strings.ToLower(to.String()),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			parent:  t.currentFrame,
+			Type:      op.String(),
+			From:      strings.ToLower(contract.Address().String()),
+			To:        strings.ToLower(to.String()),
+			GasIn:     uintToHex(gas),
+			GasCost:   uintToHex(cost),
+			parent:    t.currentFrame,
+			FourBytes: getInputFourBytes(contract.Input),
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
@@ -314,8 +325,8 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.
-//func (t *OpsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *stack.Stack, contract *vm.Contract, depth int, err error) error {
-//fmt.Println("CaptureFault", pc, op, gas, cost, depth, err)
+// func (t *OpsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *stack.Stack, contract *vm.Contract, depth int, err error) error {
+// fmt.Println("CaptureFault", pc, op, gas, cost, depth, err)
 func (t *OpsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, depth int, err error) {
 	return
 }

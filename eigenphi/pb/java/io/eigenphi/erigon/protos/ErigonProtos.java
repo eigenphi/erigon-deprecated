@@ -58,45 +58,46 @@ public final class ErigonProtos {
       descriptor;
   static {
     java.lang.String[] descriptorData = {
-      "\n\013Block.proto\022\006erigon\"\254\001\n\nstackFrame\022\014\n\004" +
+      "\n\013Block.proto\022\006erigon\"\277\001\n\nstackFrame\022\014\n\004" +
       "type\030\001 \001(\t\022\r\n\005label\030\002 \001(\t\022\014\n\004from\030\003 \001(\t\022" +
       "\n\n\002to\030\004 \001(\t\022\027\n\017contractCreated\030\005 \001(\t\022\r\n\005" +
       "value\030\006 \001(\t\022\r\n\005input\030\007 \001(\t\022\r\n\005error\030\010 \001(" +
-      "\t\022!\n\005calls\030\t \003(\0132\022.erigon.stackFrame\"O\n\013" +
-      "InternalTxn\022\027\n\017transactionHash\030\001 \001(\t\022\014\n\004" +
-      "from\030\002 \001(\t\022\n\n\002to\030\003 \001(\t\022\r\n\005value\030\004 \001(\t\"\242\002" +
-      "\n\010EventLog\022\r\n\005chain\030\001 \001(\t\022\017\n\007address\030\002 \001" +
-      "(\t\022\016\n\006topic0\030\003 \001(\t\022\016\n\006topic1\030\004 \001(\t\022\016\n\006to" +
-      "pic2\030\005 \001(\t\022\016\n\006topic3\030\006 \001(\t\022\014\n\004data\030\007 \001(\t" +
-      "\022\023\n\013blockNumber\030\010 \001(\003\022\026\n\016blockTimestamp\030" +
-      "\t \001(\003\022\027\n\017transactionHash\030\n \001(\t\022\030\n\020transa" +
-      "ctionIndex\030\013 \001(\005\022\021\n\tblockHash\030\014 \001(\t\022\020\n\010l" +
-      "ogIndex\030\r \001(\005\022\017\n\007removed\030\016 \001(\010\022\022\n\nsender" +
-      "Info\030\017 \001(\t\"\244\002\n\007Receipt\022\r\n\005chain\030\001 \001(\t\022\027\n" +
-      "\017transactionHash\030\002 \001(\t\022\030\n\020transactionInd" +
-      "ex\030\003 \001(\005\022\021\n\tblockHash\030\004 \001(\t\022\023\n\013blockNumb" +
-      "er\030\005 \001(\003\022\017\n\007gasUsed\030\006 \001(\003\022\027\n\017contractAdd" +
-      "ress\030\007 \001(\t\022 \n\030transactionReceiptStatus\030\010" +
-      " \001(\010\022\022\n\neventCount\030\t \001(\005\022\026\n\016blockTimesta" +
-      "mp\030\n \001(\003\022#\n\teventLogs\030\013 \003(\0132\020.erigon.Eve" +
-      "ntLog\022\022\n\nsenderInfo\030\014 \001(\t\"\276\001\n\013Transactio" +
-      "n\022\027\n\017transactionHash\030\001 \001(\t\022\030\n\020transactio" +
-      "nIndex\030\002 \001(\005\022\023\n\013blockNumber\030\003 \001(\003\022\023\n\013fro" +
-      "mAddress\030\004 \001(\t\022\021\n\ttoAddress\030\005 \001(\t\022\r\n\005non" +
-      "ce\030\006 \001(\003\022\030\n\020transactionValue\030\007 \001(\t\022\026\n\016bl" +
-      "ockTimestamp\030\010 \001(\003\"\240\001\n\005Block\022\023\n\013blockNum" +
-      "ber\030\002 \001(\003\022\021\n\tblockHash\030\003 \001(\t\022\022\n\nparentHa" +
-      "sh\030\004 \001(\t\022\r\n\005miner\030\006 \001(\t\022\021\n\tblockSize\030\007 \001" +
-      "(\005\022\020\n\010gasLimit\030\010 \001(\003\022\017\n\007gasUsed\030\t \001(\003\022\026\n" +
-      "\016blockTimestamp\030\n \001(\003\"\207\002\n\020TraceTransacti" +
-      "on\022\023\n\013blockNumber\030\001 \001(\003\022\027\n\017transactionHa" +
-      "sh\030\002 \001(\t\022\030\n\020transactionIndex\030\003 \001(\005\022\023\n\013fr" +
-      "omAddress\030\004 \001(\t\022\021\n\ttoAddress\030\005 \001(\t\022\020\n\010ga" +
-      "sPrice\030\006 \001(\003\022\r\n\005input\030\007 \001(\t\022\r\n\005nonce\030\010 \001" +
-      "(\003\022\030\n\020transactionValue\030\t \001(\t\022!\n\005stack\030\n " +
-      "\001(\0132\022.erigon.stackFrame\022\026\n\016blockTimestam" +
-      "p\030\013 \001(\003B7\n\031io.eigenphi.erigon.protosB\014Er" +
-      "igonProtosP\001Z\n./protobufb\006proto3"
+      "\t\022!\n\005calls\030\t \003(\0132\022.erigon.stackFrame\022\021\n\t" +
+      "fourBytes\030\n \001(\t\"O\n\013InternalTxn\022\027\n\017transa" +
+      "ctionHash\030\001 \001(\t\022\014\n\004from\030\002 \001(\t\022\n\n\002to\030\003 \001(" +
+      "\t\022\r\n\005value\030\004 \001(\t\"\242\002\n\010EventLog\022\r\n\005chain\030\001" +
+      " \001(\t\022\017\n\007address\030\002 \001(\t\022\016\n\006topic0\030\003 \001(\t\022\016\n" +
+      "\006topic1\030\004 \001(\t\022\016\n\006topic2\030\005 \001(\t\022\016\n\006topic3\030" +
+      "\006 \001(\t\022\014\n\004data\030\007 \001(\t\022\023\n\013blockNumber\030\010 \001(\003" +
+      "\022\026\n\016blockTimestamp\030\t \001(\003\022\027\n\017transactionH" +
+      "ash\030\n \001(\t\022\030\n\020transactionIndex\030\013 \001(\005\022\021\n\tb" +
+      "lockHash\030\014 \001(\t\022\020\n\010logIndex\030\r \001(\005\022\017\n\007remo" +
+      "ved\030\016 \001(\010\022\022\n\nsenderInfo\030\017 \001(\t\"\244\002\n\007Receip" +
+      "t\022\r\n\005chain\030\001 \001(\t\022\027\n\017transactionHash\030\002 \001(" +
+      "\t\022\030\n\020transactionIndex\030\003 \001(\005\022\021\n\tblockHash" +
+      "\030\004 \001(\t\022\023\n\013blockNumber\030\005 \001(\003\022\017\n\007gasUsed\030\006" +
+      " \001(\003\022\027\n\017contractAddress\030\007 \001(\t\022 \n\030transac" +
+      "tionReceiptStatus\030\010 \001(\010\022\022\n\neventCount\030\t " +
+      "\001(\005\022\026\n\016blockTimestamp\030\n \001(\003\022#\n\teventLogs" +
+      "\030\013 \003(\0132\020.erigon.EventLog\022\022\n\nsenderInfo\030\014" +
+      " \001(\t\"\276\001\n\013Transaction\022\027\n\017transactionHash\030" +
+      "\001 \001(\t\022\030\n\020transactionIndex\030\002 \001(\005\022\023\n\013block" +
+      "Number\030\003 \001(\003\022\023\n\013fromAddress\030\004 \001(\t\022\021\n\ttoA" +
+      "ddress\030\005 \001(\t\022\r\n\005nonce\030\006 \001(\003\022\030\n\020transacti" +
+      "onValue\030\007 \001(\t\022\026\n\016blockTimestamp\030\010 \001(\003\"\240\001" +
+      "\n\005Block\022\023\n\013blockNumber\030\002 \001(\003\022\021\n\tblockHas" +
+      "h\030\003 \001(\t\022\022\n\nparentHash\030\004 \001(\t\022\r\n\005miner\030\006 \001" +
+      "(\t\022\021\n\tblockSize\030\007 \001(\005\022\020\n\010gasLimit\030\010 \001(\003\022" +
+      "\017\n\007gasUsed\030\t \001(\003\022\026\n\016blockTimestamp\030\n \001(\003" +
+      "\"\207\002\n\020TraceTransaction\022\023\n\013blockNumber\030\001 \001" +
+      "(\003\022\027\n\017transactionHash\030\002 \001(\t\022\030\n\020transacti" +
+      "onIndex\030\003 \001(\005\022\023\n\013fromAddress\030\004 \001(\t\022\021\n\tto" +
+      "Address\030\005 \001(\t\022\020\n\010gasPrice\030\006 \001(\003\022\r\n\005input" +
+      "\030\007 \001(\t\022\r\n\005nonce\030\010 \001(\003\022\030\n\020transactionValu" +
+      "e\030\t \001(\t\022!\n\005stack\030\n \001(\0132\022.erigon.stackFra" +
+      "me\022\026\n\016blockTimestamp\030\013 \001(\003B7\n\031io.eigenph" +
+      "i.erigon.protosB\014ErigonProtosP\001Z\n./proto" +
+      "bufb\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -107,7 +108,7 @@ public final class ErigonProtos {
     internal_static_erigon_stackFrame_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_erigon_stackFrame_descriptor,
-        new java.lang.String[] { "Type", "Label", "From", "To", "ContractCreated", "Value", "Input", "Error", "Calls", });
+        new java.lang.String[] { "Type", "Label", "From", "To", "ContractCreated", "Value", "Input", "Error", "Calls", "FourBytes", });
     internal_static_erigon_InternalTxn_descriptor =
       getDescriptor().getMessageTypes().get(1);
     internal_static_erigon_InternalTxn_fieldAccessorTable = new
