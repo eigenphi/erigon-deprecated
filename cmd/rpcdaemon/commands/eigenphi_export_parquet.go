@@ -25,7 +25,7 @@ type PlainStackFrame struct {
 	Input           string `parquet:"fieldid=7,logical=String" json:"input"`
 	Error           string `parquet:"fieldid=8,logical=String" json:"error"`
 	ChildrenCount   int32  `parquet:"fieldid=9" json:"childrenCount"`
-	FourBytes       string `parquet:"fieldid=10" json:"fourBytes"`
+	FourBytes       string `parquet:"fieldid=10,logical=String" json:"fourBytes"`
 }
 
 type ExportTraceParquet struct {
@@ -181,6 +181,8 @@ func saveParquet(wr *pqarrow.FileWriter, sc *arrow.Schema, data []ExportTracePar
 			lvb.FieldBuilder(8).(*array.StringBuilder).Append(stack.Error)
 			//ChildrenCount   int32  `parquet:"fieldid=9"`
 			lvb.FieldBuilder(9).(*array.Int32Builder).Append(stack.ChildrenCount)
+			//FourBytes
+			lvb.FieldBuilder(10).(*array.StringBuilder).Append(stack.FourBytes)
 		}
 
 		//BlockTimestamp
