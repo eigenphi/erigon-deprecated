@@ -48,12 +48,12 @@ type OpsCallFrame struct {
 	GasIn           string          `json:"gasIn"`
 	GasCost         string          `json:"gasCost"`
 	Input           string          `json:"input,omitempty"`
+	FourBytes       string          `json:"four_bytes"`
 	Error           string          `json:"error,omitempty"`
 	Calls           []*OpsCallFrame `json:"calls,omitempty"`
 	parent          *OpsCallFrame   `json:"-"`
 	code            []byte          `json:"-"` // for calculating CREATE2 contract address
 	salt            *uint256.Int    `json:"-"` // for calculating CREATE2 contract address
-	FourBytes       string          `json:"four_bytes"`
 }
 
 var _ vm.Tracer = (*OpsTracer)(nil)
@@ -95,6 +95,9 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from common.Address, to
 			common.Hash(create2Frame.salt.Bytes32()),
 			codeHash.Bytes())
 		create2Frame.ContractCreated = contractAddr.String()
+	}
+	if t.currentFrame != nil {
+		t.currentFrame.FourBytes = getInputFourBytes(input)
 	}
 	if t.initialized {
 		return
@@ -286,14 +289,13 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 		value := stack.Back(2)
 		frame := OpsCallFrame{
-			Type:      op.String(),
-			From:      strings.ToLower(contract.Address().String()),
-			To:        strings.ToLower(to.String()),
-			Value:     value.String(),
-			GasIn:     uintToHex(gas),
-			GasCost:   uintToHex(cost),
-			parent:    t.currentFrame,
-			FourBytes: getInputFourBytes(contract.Input),
+			Type:    op.String(),
+			From:    strings.ToLower(contract.Address().String()),
+			To:      strings.ToLower(to.String()),
+			Value:   value.String(),
+			GasIn:   uintToHex(gas),
+			GasCost: uintToHex(cost),
+			parent:  t.currentFrame,
 		}
 		if !value.IsZero() {
 			frame.Label = LabelInternalTransfer
@@ -308,13 +310,12 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 		}
 
 		frame := OpsCallFrame{
-			Type:      op.String(),
-			From:      strings.ToLower(contract.Address().String()),
-			To:        strings.ToLower(to.String()),
-			GasIn:     uintToHex(gas),
-			GasCost:   uintToHex(cost),
-			parent:    t.currentFrame,
-			FourBytes: getInputFourBytes(contract.Input),
+			Type:    op.String(),
+			From:    strings.ToLower(contract.Address().String()),
+			To:      strings.ToLower(to.String()),
+			GasIn:   uintToHex(gas),
+			GasCost: uintToHex(cost),
+			parent:  t.currentFrame,
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
