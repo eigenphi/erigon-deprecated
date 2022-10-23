@@ -1,0 +1,98 @@
+syntax = "proto3";
+package erigon;
+
+option go_package = "./protobuf";
+
+option java_multiple_files = true;
+option java_package = "io.eigenphi.erigon.protos";
+option java_outer_classname = "ErigonProtos";
+
+message  stackFrame {
+  string type = 1; // OP code
+  string label = 2;// empty or "Transfer" or "Internal-Transfer"
+  string from = 3;
+  string to = 4;
+  string contractCreated = 5;
+  string value = 6;
+  string input = 7;
+  string error = 8;
+  repeated stackFrame calls = 9;
+  string fourBytes = 10;
+}
+
+message InternalTxn {
+  string transactionHash = 1;
+  string from = 2;
+  string to = 3;
+  string value = 4;
+}
+
+
+message EventLog {
+  string chain = 1;
+  string address = 2;
+  string topic0 = 3;
+  string topic1 = 4;
+  string topic2 = 5;
+  string topic3 = 6;
+  string data = 7;
+  int64 blockNumber = 8;
+  int64 blockTimestamp = 9;
+  string transactionHash = 10;
+  int32 transactionIndex = 11;
+  string blockHash = 12;
+  int32 logIndex = 13;
+  bool removed = 14;
+  string senderInfo = 15;
+}
+message  Receipt {
+  string chain = 1;
+  string transactionHash = 2;
+  int32  transactionIndex = 3;
+  string blockHash = 4;
+  int64 blockNumber = 5;
+  int64 gasUsed = 6;
+  string contractAddress = 7;
+  bool transactionReceiptStatus = 8;
+  int32 eventCount = 9;
+  int64 blockTimestamp = 10;
+  repeated  EventLog eventLogs = 11;
+  string senderInfo = 12;
+}
+
+
+message Transaction{
+  string transactionHash = 1;
+  int32 transactionIndex = 2;
+  int64  blockNumber = 3;
+  string fromAddress = 4;
+  string toAddress = 5;
+  int64 nonce = 6;
+  string transactionValue = 7;
+  int64 blockTimestamp = 8;
+}
+
+message Block {
+  int64 blockNumber = 2;
+  string blockHash = 3;
+  string parentHash = 4;
+  string miner = 6;
+  int32 blockSize = 7;
+  int64  gasLimit = 8;
+  int64  gasUsed = 9;
+  int64 blockTimestamp = 10;
+}
+
+message TraceTransaction{
+  int64  blockNumber = 1;
+  string transactionHash = 2;
+  int32 transactionIndex = 3;
+  string fromAddress = 4;
+  string toAddress = 5;
+  int64 gasPrice = 6;
+  string input = 7;
+  int64 nonce = 8;
+  string transactionValue = 9;
+  stackFrame stack = 10;
+  int64 blockTimestamp = 11;
+}
