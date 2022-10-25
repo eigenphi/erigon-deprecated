@@ -82,7 +82,7 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Context, hash common.Hash,
 	params *tracers.SimulateParams, stream *jsoniter.Stream) error {
 
-	if params.BlockNumber == nil || params.TxIndex == nil {
+	if params == nil || params.BlockNumber == nil || params.TxIndex == nil {
 		return fmt.Errorf("BlockNumber and TxIndex are required")
 	}
 
