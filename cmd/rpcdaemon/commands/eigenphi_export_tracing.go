@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/jsonpb"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/consensus/ethash"
+	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/rawdb"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
@@ -77,6 +79,98 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 		return fmt.Errorf("proto marshal %s", err)
 	}
 	return nil
+}
+
+func (api *PrivateDebugAPIImpl) getActualTxMessage(ctx context.Context, tx kv.Tx,
+	hash common.Hash) (core.Message, error) {
+
+	txn, blockHash, _, txIndex, err := rawdb.ReadTransactionByHash(tx, hash)
+	if err != nil {
+		return nil, err
+	}
+	if txn == nil {
+		return nil, fmt.Errorf("transaction %#x not found", hash)
+	}
+
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := api.blockByHashWithSenders(tx, blockHash)
+	if err != nil {
+		return nil, err
+	}
+	if block == nil {
+		return nil, fmt.Errorf("block not found")
+	}
+	getHeader := func(hash common.Hash, number uint64) *types.Header {
+		return rawdb.ReadHeader(tx, hash, number)
+	}
+	msg, _, _, _, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txIndex)
+	if err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
+func (api *PrivateDebugAPIImpl) SimulateTxAtIndex(ctx context.Context, hash common.Hash,
+	blockNumber rpc.BlockNumber, txIndex uint64) (*trace.OpsCallFrame, error) {
+
+	tx, err := api.db.BeginRo(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// get actual tx info
+	msg, err := api.getActualTxMessage(ctx, tx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := api.blockByNumberWithSenders(tx, uint64(blockNumber.Int64()))
+	if err != nil {
+		return nil, err
+	}
+	if block == nil {
+		return nil, fmt.Errorf("got empty block")
+	}
+	getHeader := func(hash common.Hash, number uint64) *types.Header {
+		return rawdb.ReadHeader(tx, hash, number)
+	}
+	_, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(
+		ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), txIndex)
+	if err != nil {
+		return nil, err
+	}
+	// Trace the transaction and return
+	config := &tracers.TraceConfig{}
+	return trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+}
+
+func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Context, hash common.Hash,
+	blockNumber rpc.BlockNumber, txIndex uint64, stream *jsoniter.Stream) error {
+
+	tracerResult, err := api.SimulateTxAtIndex(ctx, hash, blockNumber, txIndex)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+	pbTrace := toPbCallTrace(tracerResult)
+	ptxs := make([]PlainStackFrame, 0)
+	dfs(pbTrace, "0", &ptxs)
+	return json.NewEncoder(stream).Encode(PlainTraceByTx{
+		BlockNumber:      uint64(blockNumber),
+		TransactionHash:  hash.String(),
+		TransactionIndex: txIndex,
+		PlainTraces:      ptxs,
+	})
 }
 
 func (api *PrivateDebugAPIImpl) EigenphiTraceByNumber(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error {
