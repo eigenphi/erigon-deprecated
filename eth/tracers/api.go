@@ -14,8 +14,3 @@ type TraceConfig struct {
 	NoRefunds      *bool // Turns off gas refunds when tracing
 	StateOverrides *ethapi.StateOverrides
 }
-
-type SimulateParams struct {
-	BlockNumber *uint64 `json:"block_number"`
-	TxIndex     *uint64 `json:"tx_index"`
-}

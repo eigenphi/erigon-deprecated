@@ -80,11 +80,7 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 }
 
 func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Context, hash common.Hash,
-	params *tracers.SimulateParams, stream *jsoniter.Stream) error {
-
-	if params == nil || params.BlockNumber == nil || params.TxIndex == nil {
-		return fmt.Errorf("BlockNumber and TxIndex are required")
-	}
+	blockNumber rpc.BlockNumber, txIndex uint64, stream *jsoniter.Stream) error {
 
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
@@ -108,7 +104,7 @@ func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Contex
 		return err
 	}
 
-	block, err := api.blockByNumberWithSenders(tx, *params.BlockNumber)
+	block, err := api.blockByNumberWithSenders(tx, uint64(blockNumber.Int64()))
 	if err != nil {
 		return err
 	}
@@ -119,7 +115,7 @@ func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Contex
 		return rawdb.ReadHeader(tx, hash, number)
 	}
 	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(
-		ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), *params.TxIndex)
+		ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), txIndex)
 	if err != nil {
 		stream.WriteNil()
 		return err
