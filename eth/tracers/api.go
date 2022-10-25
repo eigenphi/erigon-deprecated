@@ -16,6 +16,6 @@ type TraceConfig struct {
 }
 
 type SimulateParams struct {
-	BlockNumber *uint64
-	TxIndex     *uint64
+	BlockNumber *uint64 `json:"block_number"`
+	TxIndex     *uint64 `json:"tx_index"`
 }
