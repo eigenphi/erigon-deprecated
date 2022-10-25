@@ -79,6 +79,66 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 	return nil
 }
 
+func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Context, hash common.Hash,
+	params *tracers.SimulateParams, stream *jsoniter.Stream) error {
+
+	if params.BlockNumber == nil || params.TxIndex == nil {
+		return fmt.Errorf("BlockNumber and TxIndex are required")
+	}
+
+	tx, err := api.db.BeginRo(ctx)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+	defer tx.Rollback()
+	// Retrieve the transaction and assemble its EVM context
+	txn, _, _, _, err := rawdb.ReadTransactionByHash(tx, hash)
+	if err != nil {
+		return err
+	}
+	if txn == nil {
+		stream.WriteNil()
+		return fmt.Errorf("transaction %#x not found", hash)
+	}
+
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+
+	block, err := api.blockByNumberWithSenders(tx, *params.BlockNumber)
+	if err != nil {
+		return err
+	}
+	if block == nil {
+		return nil
+	}
+	getHeader := func(hash common.Hash, number uint64) *types.Header {
+		return rawdb.ReadHeader(tx, hash, number)
+	}
+	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(
+		ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), *params.TxIndex)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+	// Trace the transaction and return
+	config := &tracers.TraceConfig{}
+	tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	if err != nil {
+		stream.WriteNil()
+		return err
+	}
+	out := jsonpb.Marshaler{EmitDefaults: true}
+	pbTrace := toPbCallTrace(tracerResult)
+	if err := out.Marshal(stream, pbTrace); err != nil {
+		return fmt.Errorf("proto marshal %s", err)
+	}
+	return nil
+}
+
 func (api *PrivateDebugAPIImpl) EigenphiTraceByNumber(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error {
 	defer stream.Flush()
 
