@@ -114,35 +114,32 @@ func (api *PrivateDebugAPIImpl) getActualTxMessage(ctx context.Context, tx kv.Tx
 	return msg, nil
 }
 
-func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Context, hash common.Hash,
-	blockNumber rpc.BlockNumber, txIndex uint64, stream *jsoniter.Stream) error {
-
-	fmt.Println("sim params", hash.String(), uint64(blockNumber.Int64()), txIndex)
+func (api *PrivateDebugAPIImpl) SimulateTxAtIndex(ctx context.Context, hash common.Hash,
+	blockNumber rpc.BlockNumber, txIndex uint64) (*trace.OpsCallFrame, error) {
 
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
-		stream.WriteNil()
-		return err
+		return nil, err
 	}
 	defer tx.Rollback()
 
+	// get actual tx info
 	msg, err := api.getActualTxMessage(ctx, tx, hash)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	chainConfig, err := api.chainConfig(tx)
 	if err != nil {
-		stream.WriteNil()
-		return err
+		return nil, err
 	}
 
 	block, err := api.blockByNumberWithSenders(tx, uint64(blockNumber.Int64()))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if block == nil {
-		return nil
+		return nil, fmt.Errorf("got empty block")
 	}
 	getHeader := func(hash common.Hash, number uint64) *types.Header {
 		return rawdb.ReadHeader(tx, hash, number)
@@ -150,22 +147,30 @@ func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Contex
 	_, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(
 		ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), txIndex)
 	if err != nil {
-		stream.WriteNil()
-		return err
+		return nil, err
 	}
 	// Trace the transaction and return
 	config := &tracers.TraceConfig{}
-	tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	return trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+}
+
+func (api *PrivateDebugAPIImpl) EigenphiSimulateTxTraceByHash(ctx context.Context, hash common.Hash,
+	blockNumber rpc.BlockNumber, txIndex uint64, stream *jsoniter.Stream) error {
+
+	tracerResult, err := api.SimulateTxAtIndex(ctx, hash, blockNumber, txIndex)
 	if err != nil {
 		stream.WriteNil()
 		return err
 	}
-	out := jsonpb.Marshaler{EmitDefaults: true}
 	pbTrace := toPbCallTrace(tracerResult)
-	if err := out.Marshal(stream, pbTrace); err != nil {
-		return fmt.Errorf("proto marshal %s", err)
-	}
-	return nil
+	ptxs := make([]PlainStackFrame, 0)
+	dfs(pbTrace, "0", &ptxs)
+	return json.NewEncoder(stream).Encode(PlainTraceByTx{
+		BlockNumber:      uint64(blockNumber),
+		TransactionHash:  hash.String(),
+		TransactionIndex: txIndex,
+		PlainTraces:      ptxs,
+	})
 }
 
 func (api *PrivateDebugAPIImpl) EigenphiTraceByNumber(ctx context.Context, height rpc.BlockNumber, stream *jsoniter.Stream) error {
