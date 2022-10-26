@@ -84,11 +84,40 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash 
 func (api *PrivateDebugAPIImpl) getActualTxMessage(ctx context.Context, tx kv.Tx,
 	hash common.Hash) (core.Message, error) {
 
-	txn, blockHash, _, txIndex, err := rawdb.ReadTransactionByHash(tx, hash)
+	blockNum, ok, err := api.txnLookup(ctx, tx, hash)
 	if err != nil {
 		return nil, err
 	}
+	if !ok {
+		return nil, fmt.Errorf("txn not found")
+	}
+	block, err := api.blockByNumberWithSenders(tx, blockNum)
+	if err != nil {
+		return nil, err
+	}
+	if block == nil {
+		return nil, fmt.Errorf("block not found")
+	}
+	blockHash := block.Hash()
+	var txnIndex uint64
+	var txn types.Transaction
+	for i, transaction := range block.Transactions() {
+		if transaction.Hash() == hash {
+			txnIndex = uint64(i)
+			txn = transaction
+			break
+		}
+	}
 	if txn == nil {
+		var borTx types.Transaction
+		borTx, _, _, _, err = rawdb.ReadBorTransaction(tx, hash)
+		if err != nil {
+			return nil, err
+		}
+
+		if borTx != nil {
+			return nil, fmt.Errorf("borTx is nil")
+		}
 		return nil, fmt.Errorf("transaction %#x not found", hash)
 	}
 
@@ -97,17 +126,10 @@ func (api *PrivateDebugAPIImpl) getActualTxMessage(ctx context.Context, tx kv.Tx
 		return nil, err
 	}
 
-	block, err := api.blockByHashWithSenders(tx, blockHash)
-	if err != nil {
-		return nil, err
-	}
-	if block == nil {
-		return nil, fmt.Errorf("block not found")
-	}
 	getHeader := func(hash common.Hash, number uint64) *types.Header {
 		return rawdb.ReadHeader(tx, hash, number)
 	}
-	msg, _, _, _, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txIndex)
+	msg, _, _, _, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txnIndex)
 	if err != nil {
 		return nil, err
 	}
