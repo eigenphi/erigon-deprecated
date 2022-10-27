@@ -28,47 +28,74 @@ import (
 
 var _ PrivateDebugAPI = (*PrivateDebugAPIImpl)(nil)
 
-func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash common.Hash, stream *jsoniter.Stream) error {
+// modified from api.TraceTransaction
+func (api *PrivateDebugAPIImpl) traceTx(ctx context.Context, hash common.Hash) (traceResult *trace.OpsCallFrame,
+	blockNumber uint64, txIndex uint64, err error) {
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
-		stream.WriteNil()
-		return err
+		return
 	}
 	defer tx.Rollback()
 	// Retrieve the transaction and assemble its EVM context
-	txn, blockHash, _, txIndex, err := rawdb.ReadTransactionByHash(tx, hash)
+	blockNumber, ok, err := api.txnLookup(ctx, tx, hash)
 	if err != nil {
-		return err
+		return
 	}
-	if txn == nil {
-		stream.WriteNil()
-		return fmt.Errorf("transaction %#x not found", hash)
+	if !ok {
+		err = fmt.Errorf("txn not found")
+		return
 	}
-
-	chainConfig, err := api.chainConfig(tx)
+	block, err := api.blockByNumberWithSenders(tx, blockNumber)
 	if err != nil {
-		stream.WriteNil()
-		return err
-	}
-
-	block, err := api.blockByHashWithSenders(tx, blockHash)
-	if err != nil {
-		return err
+		return
 	}
 	if block == nil {
-		return nil
+		err = fmt.Errorf("block not found")
+		return
 	}
+	blockHash := block.Hash()
+	var txn types.Transaction
+	for i, transaction := range block.Transactions() {
+		if transaction.Hash() == hash {
+			txIndex = uint64(i)
+			txn = transaction
+			break
+		}
+	}
+	if txn == nil {
+		var borTx types.Transaction
+		borTx, _, _, _, err = rawdb.ReadBorTransaction(tx, hash)
+		if err != nil {
+			return
+		}
+
+		if borTx != nil {
+			err = fmt.Errorf("borTx is nil")
+			return
+		}
+		err = fmt.Errorf("transaction %#x not found", hash)
+		return
+	}
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		return
+	}
+
 	getHeader := func(hash common.Hash, number uint64) *types.Header {
 		return rawdb.ReadHeader(tx, hash, number)
 	}
-	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txIndex)
+	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block,
+		chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txIndex)
 	if err != nil {
-		stream.WriteNil()
-		return err
+		return
 	}
-	// Trace the transaction and return
 	config := &tracers.TraceConfig{}
-	tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	traceResult, err = trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	return traceResult, blockNumber, txIndex, err
+}
+
+func (api *PrivateDebugAPIImpl) EigenphiTraceByTxHash(ctx context.Context, hash common.Hash, stream *jsoniter.Stream) error {
+	tracerResult, _, _, err := api.traceTx(ctx, hash)
 	if err != nil {
 		stream.WriteNil()
 		return err
@@ -211,46 +238,7 @@ func (api *PrivateDebugAPIImpl) EigenphiTraceByNumber(ctx context.Context, heigh
 }
 
 func (api *PrivateDebugAPIImpl) EigenphiPlainTraceByTxHash(ctx context.Context, hash common.Hash, stream *jsoniter.Stream) error {
-	tx, err := api.db.BeginRo(ctx)
-	if err != nil {
-		stream.WriteNil()
-		return err
-	}
-	defer tx.Rollback()
-	// Retrieve the transaction and assemble its EVM context
-	txn, blockHash, _, txIndex, err := rawdb.ReadTransactionByHash(tx, hash)
-	if err != nil {
-		return err
-	}
-	if txn == nil {
-		stream.WriteNil()
-		return fmt.Errorf("transaction %#x not found", hash)
-	}
-
-	chainConfig, err := api.chainConfig(tx)
-	if err != nil {
-		stream.WriteNil()
-		return err
-	}
-
-	block, err := api.blockByHashWithSenders(tx, blockHash)
-	if err != nil {
-		return err
-	}
-	if block == nil {
-		return nil
-	}
-	getHeader := func(hash common.Hash, number uint64) *types.Header {
-		return rawdb.ReadHeader(tx, hash, number)
-	}
-	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txIndex)
-	if err != nil {
-		stream.WriteNil()
-		return err
-	}
-	// Trace the transaction and return
-	config := &tracers.TraceConfig{}
-	tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
+	tracerResult, blockNumber, txIndex, err := api.traceTx(ctx, hash)
 	if err != nil {
 		stream.WriteNil()
 		return err
@@ -259,7 +247,7 @@ func (api *PrivateDebugAPIImpl) EigenphiPlainTraceByTxHash(ctx context.Context, 
 	ptxs := make([]PlainStackFrame, 0)
 	dfs(pbTrace, "0", &ptxs)
 	return json.NewEncoder(stream).Encode(PlainTraceByTx{
-		BlockNumber:      block.NumberU64(),
+		BlockNumber:      blockNumber,
 		TransactionHash:  hash.String(),
 		TransactionIndex: txIndex,
 		PlainTraces:      ptxs,
@@ -297,11 +285,6 @@ func (api *PrivateDebugAPIImpl) EigenphiPlainTraceByNumber(ctx context.Context, 
 	}
 
 	return json.NewEncoder(stream).Encode(rets)
-}
-
-type TxOpsTracer struct {
-	Hash  common.Hash
-	trace trace.OpsCallFrame
 }
 
 func (api *PrivateDebugAPIImpl) getSimpleBlock(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
