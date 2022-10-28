@@ -50,7 +50,8 @@ func TraceTxByOpsTracer(
 	if config != nil && config.NoRefunds != nil && *config.NoRefunds {
 		refunds = false
 	}
-	core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()), refunds, false)
+	traceResult, err := core.ApplyMessage(vmenv, message, new(core.GasPool).AddGas(message.Gas()), refunds, false)
+	fmt.Println(traceResult, err)
 
 	t, ok := tracer.(*OpsTracer)
 	if !ok {
