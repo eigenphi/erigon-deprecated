@@ -9,9 +9,9 @@ import (
 	"github.com/ledgerwatch/erigon-lib/kv"
 	"github.com/ledgerwatch/erigon/common"
 	"github.com/ledgerwatch/erigon/common/hexutil"
-	"github.com/ledgerwatch/erigon/consensus/ethash"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/rawdb"
+	"github.com/ledgerwatch/erigon/core/state"
 	"github.com/ledgerwatch/erigon/core/types"
 	"github.com/ledgerwatch/erigon/core/vm"
 	"github.com/ledgerwatch/erigon/eigenphi/opstrace"
@@ -53,7 +53,6 @@ func (api *PrivateDebugAPIImpl) traceTx(ctx context.Context, hash common.Hash) (
 		err = fmt.Errorf("block not found")
 		return
 	}
-	blockHash := block.Hash()
 	var txn types.Transaction
 	for i, transaction := range block.Transactions() {
 		if transaction.Hash() == hash {
@@ -81,11 +80,8 @@ func (api *PrivateDebugAPIImpl) traceTx(ctx context.Context, hash common.Hash) (
 		return
 	}
 
-	getHeader := func(hash common.Hash, number uint64) *types.Header {
-		return rawdb.ReadHeader(tx, hash, number)
-	}
 	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block,
-		chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txIndex)
+		chainConfig, api._blockReader, tx, txIndex, api._agg, api.historyV3(tx))
 	if err != nil {
 		return
 	}
@@ -125,7 +121,6 @@ func (api *PrivateDebugAPIImpl) getActualTxMessage(ctx context.Context, tx kv.Tx
 	if block == nil {
 		return nil, fmt.Errorf("block not found")
 	}
-	blockHash := block.Hash()
 	var txnIndex uint64
 	var txn types.Transaction
 	for i, transaction := range block.Transactions() {
@@ -153,10 +148,8 @@ func (api *PrivateDebugAPIImpl) getActualTxMessage(ctx context.Context, tx kv.Tx
 		return nil, err
 	}
 
-	getHeader := func(hash common.Hash, number uint64) *types.Header {
-		return rawdb.ReadHeader(tx, hash, number)
-	}
-	msg, _, _, _, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, blockHash, txnIndex)
+	msg, _, _, _, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig,
+		api._blockReader, tx, txnIndex, api._agg, api.historyV3(tx))
 	if err != nil {
 		return nil, err
 	}
@@ -190,11 +183,8 @@ func (api *PrivateDebugAPIImpl) SimulateTxAtIndex(ctx context.Context, hash comm
 	if block == nil {
 		return nil, fmt.Errorf("got empty block")
 	}
-	getHeader := func(hash common.Hash, number uint64) *types.Header {
-		return rawdb.ReadHeader(tx, hash, number)
-	}
 	_, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(
-		ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), txIndex)
+		ctx, block, chainConfig, api._blockReader, tx, txIndex, api._agg, api.historyV3(tx))
 	if err != nil {
 		return nil, err
 	}
@@ -365,11 +355,8 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlockRaw(ctx context.Context, blockNr
 		return nil, err
 	}
 
-	getHeader := func(hash common.Hash, number uint64) *types.Header {
-		return rawdb.ReadHeader(tx, hash, number)
-	}
-
-	_, blockCtx, _, ibs, reader, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), 0)
+	_, blockCtx, _, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig,
+		api._blockReader, tx, 0, api._agg, api.historyV3(tx))
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +381,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlockRaw(ctx context.Context, blockNr
 		}
 
 		tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
-		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
+		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), state.NewNoopWriter())
 		if err != nil {
 			// TODO handle trace transaction error
 			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)
@@ -431,11 +418,8 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		return err
 	}
 
-	getHeader := func(hash common.Hash, number uint64) *types.Header {
-		return rawdb.ReadHeader(tx, hash, number)
-	}
-
-	_, blockCtx, _, ibs, reader, err := transactions.ComputeTxEnv(ctx, block, chainConfig, getHeader, ethash.NewFaker(), tx, block.Hash(), 0)
+	_, blockCtx, _, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig,
+		api._blockReader, tx, 0, api._agg, api.historyV3(tx))
 	if err != nil {
 		return err
 	}
@@ -460,7 +444,7 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		}
 
 		tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
-		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), reader)
+		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), state.NewNoopWriter())
 		if err != nil {
 			// TODO handle trace transaction error
 			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)

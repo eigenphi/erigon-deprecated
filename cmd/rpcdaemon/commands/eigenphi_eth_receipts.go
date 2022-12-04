@@ -32,7 +32,7 @@ func (api *APIImpl) GetTransactionReceiptsByBlockNumber(ctx context.Context, blo
 	}
 	txs := block.Transactions()
 
-	receipts, err := getReceipts(ctx, tx, cc, block, block.Body().SendersFromTxs())
+	receipts, err := api.getReceipts(ctx, tx, cc, block, block.Body().SendersFromTxs())
 	if err != nil {
 		return nil, fmt.Errorf("getReceipts error: %w", err)
 	}
