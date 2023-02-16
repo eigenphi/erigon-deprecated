@@ -174,6 +174,20 @@ func getInputFourBytes(input []byte) string {
 	return hex.EncodeToString(input[:4])
 }
 
+func CopyBytes(b []byte) (copiedBytes []byte) {
+	if b == nil {
+		return nil
+	}
+	copiedBytes = make([]byte, len(b))
+	copy(copiedBytes, b)
+
+	return
+}
+
+func getInput(scope *vm.ScopeContext) []byte {
+	return CopyBytes(scope.Contract.Input)
+}
+
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
 //func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *stack.Stack, rData []byte, contract *vm.Contract, depth int, err error) error {
 
@@ -251,6 +265,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
+			Input:   bytesToHex(getInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if op == vm.CREATE {
@@ -276,6 +291,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
+			Input:   bytesToHex(getInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if value.Uint64() != 0 {
@@ -295,6 +311,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			Value:   value.String(),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
+			Input:   bytesToHex(getInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if !value.IsZero() {
@@ -316,6 +333,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
+			Input:   bytesToHex(getInput(scope)),
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
