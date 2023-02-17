@@ -110,6 +110,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from common.Address, to
 		GasIn:     uintToHex(gas),
 		Value:     bigToHex(value),
 		FourBytes: getInputFourBytes(input),
+		Input:     bytesToHex(input),
 	}
 	if create {
 		t.callstack.Type = "CREATE"
