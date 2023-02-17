@@ -184,8 +184,22 @@ func CopyBytes(b []byte) (copiedBytes []byte) {
 	return
 }
 
-func getInput(scope *vm.ScopeContext) []byte {
-	return CopyBytes(scope.Contract.Input)
+func getCallInput(scope *vm.ScopeContext) []byte {
+	if scope.Stack == nil {
+		return nil
+	}
+	inOffset := scope.Stack.Back(2)
+	inSize := scope.Stack.Back(3)
+	return scope.Memory.GetCopy(inOffset.Uint64(), inSize.Uint64())
+}
+
+func getDelegateCallInput(scope *vm.ScopeContext) []byte {
+	if scope.Stack == nil {
+		return nil
+	}
+	inOffset := scope.Stack.Back(1)
+	inSize := scope.Stack.Back(2)
+	return scope.Memory.GetCopy(inOffset.Uint64(), inSize.Uint64())
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
@@ -265,7 +279,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
-			Input:   bytesToHex(getInput(scope)),
+			Input:   bytesToHex(getDelegateCallInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if op == vm.CREATE {
@@ -291,7 +305,6 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
-			Input:   bytesToHex(getInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if value.Uint64() != 0 {
@@ -311,7 +324,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			Value:   value.String(),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
-			Input:   bytesToHex(getInput(scope)),
+			Input:   bytesToHex(getCallInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if !value.IsZero() {
@@ -333,7 +346,7 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
-			Input:   bytesToHex(getInput(scope)),
+			Input:   bytesToHex(getDelegateCallInput(scope)),
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
