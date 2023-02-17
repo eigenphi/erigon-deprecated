@@ -98,6 +98,7 @@ func (t *OpsTracer) CaptureStart(env *vm.EVM, depth int, from common.Address, to
 	}
 	if t.currentFrame != nil {
 		t.currentFrame.FourBytes = getInputFourBytes(input)
+		t.currentFrame.Input = bytesToHex(input)
 	}
 	if t.initialized {
 		return
@@ -279,7 +280,6 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			Value:   value.String(),
-			Input:   bytesToHex(getDelegateCallInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if op == vm.CREATE {
@@ -324,7 +324,6 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			Value:   value.String(),
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
-			Input:   bytesToHex(getCallInput(scope)),
 			parent:  t.currentFrame,
 		}
 		if !value.IsZero() {
@@ -346,7 +345,6 @@ func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost
 			GasIn:   uintToHex(gas),
 			GasCost: uintToHex(cost),
 			parent:  t.currentFrame,
-			Input:   bytesToHex(getDelegateCallInput(scope)),
 		}
 
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
