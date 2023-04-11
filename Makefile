@@ -40,7 +40,9 @@ GOTEST = $(CGO_CFLAGS) GODEBUG=cgocheck=0 $(GO) test $(GO_FLAGS) ./... -p 2
 
 default: all
 
-## go-version:                        print and verify go version
+export-parquet:
+	CGO_ENABLED=0 $(GO) build -o $(GOBIN)/export-parquet cmd/export-parquet/main.go
+
 go-version:
 	@if [ $(shell $(GO) version | cut -c 16-17) -lt 18 ]; then \
 		echo "minimum required Golang version is 1.18"; \
