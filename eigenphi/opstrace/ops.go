@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/holiman/uint256"
 	libcommon "github.com/ledgerwatch/erigon-lib/common"
 	"github.com/ledgerwatch/erigon/core/vm/stack"
@@ -60,37 +59,66 @@ var _ tracers.Tracer = (*OpsTracer)(nil)
 
 type OpsTracer struct {
 	callstack    OpsCallFrame
-	currentDepth int
 	currentFrame *OpsCallFrame
-	interrupt    uint32 // Atomic flag to signal execution interruption
 	initialized  bool
 }
 
 func (t *OpsTracer) CaptureTxStart(gasLimit uint64) {
-	fmt.Println("CaptureTxStart", gasLimit)
+	//fmt.Println("CaptureTxStart", gasLimit)
 	return
 }
 
 func (t *OpsTracer) CaptureTxEnd(restGas uint64) {
-	fmt.Println("CaptureTxEnd", restGas)
+	//fmt.Println("CaptureTxEnd", restGas)
 	return
 }
 
 func (t *OpsTracer) CaptureEnter(op vm.OpCode, from libcommon.Address, to libcommon.Address, precompile bool,
 	create bool, input []byte, gas uint64, value *uint256.Int, code []byte) {
-	fmt.Println("CaptureEnter", op, from, to, precompile, create,
-		hex.EncodeToString(input), gas, bigToHex(value))
-	if precompile {
-		return
+
+	//printInput := input[:]
+	//if len(printInput) > 40 {
+	//	printInput = printInput[:40]
+	//}
+	//fmt.Println("CaptureEnter", op, from, to, precompile, create,
+	//	hex.EncodeToString(printInput), gas, bigToHex(value))
+
+	frame := OpsCallFrame{
+		Type:      op.String(),
+		From:      addrToHex(from),
+		To:        addrToHex(to),
+		Value:     bigToHex(value),
+		GasIn:     uintToHex(gas),
+		parent:    t.currentFrame,
+		FourBytes: getInputFourBytes(input),
 	}
+	if op == vm.CREATE || op == vm.CREATE2 {
+		frame.ContractCreated = frame.To
+		frame.To = ""
+	}
+	if value != nil && !value.IsZero() {
+		frame.Label = LabelInternalTransfer
+	}
+	t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
+	t.currentFrame = &frame
 }
 
 func (t *OpsTracer) CaptureExit(output []byte, usedGas uint64, err error) {
-	fmt.Println("CaptureExit", hex.EncodeToString(output), usedGas, err)
+	//printOutput := output[:]
+	//if len(printOutput) > 40 {
+	//	printOutput = printOutput[:40]
+	//}
+	//fmt.Println("CaptureExit", hex.EncodeToString(printOutput), usedGas, err)
+
+	t.currentFrame.GasCost = uintToHex(usedGas)
+	if err != nil {
+		t.currentFrame.Error = err.Error()
+		t.currentFrame.Calls = []*OpsCallFrame{}
+	}
+	t.currentFrame = t.currentFrame.parent
 }
 
 func (t *OpsTracer) Stop(err error) {
-	fmt.Println("Stop", err)
 	return
 }
 
@@ -111,11 +139,13 @@ func init() {
 // CaptureStart implements the EVMLogger interface to initialize the tracing operation.
 func (t *OpsTracer) CaptureStart(env vm.VMInterface, from, to common.Address,
 	precompile bool, create bool, input []byte, gas uint64, value *uint256.Int, code []byte) {
-	fmt.Println("CaptureStart", from.String(), to.String(), precompile,
-		create, hex.EncodeToString(input), gas, bigToHex(value))
-	if precompile {
-		return
-	}
+
+	//printInput := input[:]
+	//if len(printInput) > 40 {
+	//	printInput = printInput[:40]
+	//}
+	//fmt.Println("CaptureStart", from.String(), to.String(), precompile,
+	//	create, hex.EncodeToString(printInput), gas, bigToHex(value))
 
 	if t.initialized {
 		frame := OpsCallFrame{
@@ -139,14 +169,16 @@ func (t *OpsTracer) CaptureStart(env vm.VMInterface, from, to common.Address,
 		t.currentFrame.Type = "CREATE"
 		t.currentFrame.ContractCreated = addrToHex(to)
 	}
+	if value != nil && !value.IsZero() {
+		t.currentFrame.Label = LabelInternalTransfer
+	}
 }
 
 // CaptureEnd is called after the call finishes to finalize the tracing.
 // func (t *OpsTracer) CaptureEnd(depth int, output []byte, startGas, endGas uint64, duration time.Duration, err error) error {
-// fmt.Println("CaptureEnd", depth, t.currentDepth, err)
 // precompiled calls don't have a callframe
 func (t *OpsTracer) CaptureEnd(output []byte, usedGas uint64, err error) {
-	fmt.Println("CaptureEnd", hex.EncodeToString(output), usedGas, err)
+	//fmt.Println("CaptureEnd", hex.EncodeToString(output), usedGas, err)
 	t.currentFrame.GasCost = uintToHex(usedGas)
 	if err != nil {
 		t.currentFrame.Error = err.Error()
@@ -154,8 +186,6 @@ func (t *OpsTracer) CaptureEnd(output []byte, usedGas uint64, err error) {
 	}
 
 	t.currentFrame = t.currentFrame.parent
-	t.currentDepth -= 1
-	return
 }
 
 // Note the result has no "0x" prefix
@@ -195,34 +225,19 @@ func getInputFourBytes(input []byte) string {
 }
 
 // CaptureState implements the EVMLogger interface to trace a single step of VM execution.
-//func (t *OpsTracer) CaptureState(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *stack.Stack, rData []byte, contract *vm.Contract, depth int, err error) error {
-
 func (t *OpsTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, rData []byte, depth int, err error) {
-	fmt.Println("CaptureState", pc, op.String(), gas, cost, depth, err)
+	//for _, opToPrint := range []vm.OpCode{
+	//	vm.LOG0, vm.LOG1, vm.LOG2, vm.LOG3, vm.LOG4,
+	//	vm.CREATE, vm.CALL, vm.CALLCODE, vm.DELEGATECALL, vm.CREATE2, vm.STATICCALL,
+	//	vm.SELFDESTRUCT, vm.REVERT,
+	//} {
+	//	if op == opToPrint {
+	//		fmt.Println("CaptureState", pc, op.String(), gas, cost, depth, err)
+	//	}
+	//}
 	stack := scope.Stack
 	contract := scope.Contract
 	memory := scope.Memory
-	if err != nil {
-		if t.currentFrame != nil {
-			t.currentFrame.Error = err.Error()
-			t.currentFrame.Calls = []*OpsCallFrame{}
-			t.currentFrame = t.currentFrame.parent
-			t.currentDepth -= 1
-		}
-		return
-	}
-	// Fix txs like 0x3494b6a2f62a558c46660691f68e4e2a47694e0b02fad1969e1f0dc725fc9ee5,
-	// where a sub-CALL is failed but the whole tx is not reverted.
-	if t.currentDepth == depth+1 && (t.currentFrame.Type == vm.CALL.String() ||
-		t.currentFrame.Type == vm.CALLCODE.String() ||
-		t.currentFrame.Type == vm.DELEGATECALL.String() ||
-		t.currentFrame.Type == vm.STATICCALL.String() ||
-		t.currentFrame.Type == vm.CREATE.String() ||
-		t.currentFrame.Type == vm.CREATE2.String()) {
-		t.currentFrame.Error = "Subcall reverted"
-		t.currentFrame = t.currentFrame.parent
-		t.currentDepth -= 1
-	}
 
 	if op == vm.LOG0 || op == vm.LOG1 || op == vm.LOG2 || op == vm.LOG3 || op == vm.LOG4 {
 		var topic0, topic1, topic2, topic3, logInput string
@@ -258,93 +273,14 @@ func (t *OpsTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint64, scop
 			parent:  t.currentFrame,
 		}
 		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
-		return
 	}
-
-	switch op {
-	case vm.CREATE, vm.CREATE2:
-		value := stack.Back(0)
-		from := contract.Address()
-		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(from.String()),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			Value:   value.String(),
-			parent:  t.currentFrame,
-		}
-		if op == vm.CREATE2 {
-			frame.salt = stack.Back(3)
-		}
-		if !value.IsZero() {
-			frame.Label = LabelInternalTransfer
-		}
-		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
-		t.currentFrame = &frame
-		t.currentDepth += 1
-	case vm.SELFDESTRUCT:
-		var to common.Address = stack.Back(0).Bytes20()
-		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(contract.Address().String()),
-			To:      strings.ToLower(to.String()),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			//Value:   value.String(),
-			parent: t.currentFrame,
-		}
-		//if value.Uint64() != 0 {
-		//	frame.Label = LabelInternalTransfer
-		//}
-		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
-	case vm.CALL, vm.CALLCODE:
-		var to common.Address = stack.Back(1).Bytes20()
-		//if t.isPrecompiled(env, to) {
-		//	return
-		//}
-		value := stack.Back(2)
-		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(contract.Address().String()),
-			To:      strings.ToLower(to.String()),
-			Value:   value.String(),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			parent:  t.currentFrame,
-		}
-		if !value.IsZero() {
-			frame.Label = LabelInternalTransfer
-		}
-		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
-		t.currentFrame = &frame
-		t.currentDepth += 1
-	case vm.DELEGATECALL, vm.STATICCALL:
-		var to common.Address = stack.Back(1).Bytes20()
-		//if t.isPrecompiled(env, to) {
-		//	return
-		//}
-
-		frame := OpsCallFrame{
-			Type:    op.String(),
-			From:    strings.ToLower(contract.Address().String()),
-			To:      strings.ToLower(to.String()),
-			GasIn:   uintToHex(gas),
-			GasCost: uintToHex(cost),
-			parent:  t.currentFrame,
-		}
-
-		t.currentFrame.Calls = append(t.currentFrame.Calls, &frame)
-		t.currentFrame = &frame
-		t.currentDepth += 1
-	}
-	return
 }
 
 // CaptureFault implements the EVMLogger interface to trace an execution fault.
 // func (t *OpsTracer) CaptureFault(env *vm.EVM, pc uint64, op vm.OpCode, gas, cost uint64, memory *vm.Memory, stack *stack.Stack, contract *vm.Contract, depth int, err error) error {
 // fmt.Println("CaptureFault", pc, op, gas, cost, depth, err)
 func (t *OpsTracer) CaptureFault(pc uint64, op vm.OpCode, gas, cost uint64, scope *vm.ScopeContext, depth int, err error) {
-	fmt.Println("CaptureFault", pc, op.String(), gas, cost, depth, err)
+	//fmt.Println("CaptureFault", pc, op.String(), gas, cost, depth, err)
 	return
 }
 
