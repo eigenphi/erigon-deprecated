@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ledgerwatch/erigon-lib/chain"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/vm"
+	"github.com/ledgerwatch/erigon/core/vm/evmtypes"
 	"github.com/ledgerwatch/erigon/eth/tracers"
-	"github.com/ledgerwatch/erigon/params"
 	"time"
 )
 
@@ -17,11 +18,11 @@ import (
 func TraceTxByOpsTracer(
 	ctx context.Context,
 	message core.Message,
-	blockCtx vm.BlockContext,
-	txCtx vm.TxContext,
-	ibs vm.IntraBlockState,
+	blockCtx evmtypes.BlockContext,
+	txCtx evmtypes.TxContext,
+	ibs evmtypes.IntraBlockState,
 	config *tracers.TraceConfig,
-	chainConfig *params.ChainConfig,
+	chainConfig *chain.Config,
 ) (*OpsCallFrame, error) {
 	// Assemble the structured logger or the JavaScript tracer
 	var (
@@ -39,7 +40,7 @@ func TraceTxByOpsTracer(
 	deadlineCtx, cancel := context.WithTimeout(ctx, timeout)
 	go func() {
 		<-deadlineCtx.Done()
-		if t, ok := tracer.(*tracers.Tracer); ok {
+		if t, ok := tracer.(tracers.Tracer); ok {
 			t.Stop(errors.New("execution timeout"))
 		}
 	}()

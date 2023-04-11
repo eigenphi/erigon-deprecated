@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/jsonpb"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/ledgerwatch/erigon-lib/common"
+	"github.com/ledgerwatch/erigon-lib/common/hexutility"
 	"github.com/ledgerwatch/erigon-lib/kv"
-	"github.com/ledgerwatch/erigon/common"
-	"github.com/ledgerwatch/erigon/common/hexutil"
 	"github.com/ledgerwatch/erigon/core"
 	"github.com/ledgerwatch/erigon/core/rawdb"
 	"github.com/ledgerwatch/erigon/core/state"
 	"github.com/ledgerwatch/erigon/core/types"
-	"github.com/ledgerwatch/erigon/core/vm"
+	"github.com/ledgerwatch/erigon/core/vm/evmtypes"
 	"github.com/ledgerwatch/erigon/eigenphi/opstrace"
 	"github.com/ledgerwatch/erigon/eigenphi/pb/go/protobuf"
 	"github.com/ledgerwatch/erigon/eth/tracers"
@@ -36,6 +36,10 @@ func (api *PrivateDebugAPIImpl) traceTx(ctx context.Context, hash common.Hash) (
 		return
 	}
 	defer tx.Rollback()
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		return
+	}
 	// Retrieve the transaction and assemble its EVM context
 	blockNumber, ok, err := api.txnLookup(ctx, tx, hash)
 	if err != nil {
@@ -44,6 +48,24 @@ func (api *PrivateDebugAPIImpl) traceTx(ctx context.Context, hash common.Hash) (
 	if !ok {
 		err = fmt.Errorf("txn not found")
 		return
+	}
+	// check pruning to ensure we have history at this block level
+	err = api.BaseAPI.checkPruneHistory(tx, blockNumber)
+	if err != nil {
+		return
+	}
+	// Private API returns 0 if transaction is not found.
+	if blockNumber == 0 && chainConfig.Bor != nil {
+		var blockNumPtr *uint64
+		blockNumPtr, err = rawdb.ReadBorTxLookupEntry(tx, hash)
+		if err != nil {
+			return
+		}
+		if blockNumPtr == nil {
+			err = fmt.Errorf("block not found")
+			return
+		}
+		blockNumber = *blockNumPtr
 	}
 	block, err := api.blockByNumberWithSenders(tx, blockNumber)
 	if err != nil {
@@ -75,13 +97,10 @@ func (api *PrivateDebugAPIImpl) traceTx(ctx context.Context, hash common.Hash) (
 		err = fmt.Errorf("transaction %#x not found", hash)
 		return
 	}
-	chainConfig, err := api.chainConfig(tx)
-	if err != nil {
-		return
-	}
+	engine := api.engine()
 
-	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, block,
-		chainConfig, api._blockReader, tx, txIndex, api._agg, api.historyV3(tx))
+	msg, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(ctx, engine, block,
+		chainConfig, api._blockReader, tx, int(txIndex), api.historyV3(tx))
 	if err != nil {
 		return
 	}
@@ -147,9 +166,10 @@ func (api *PrivateDebugAPIImpl) getActualTxMessage(ctx context.Context, tx kv.Tx
 	if err != nil {
 		return nil, err
 	}
+	engine := api.engine()
 
-	msg, _, _, _, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig,
-		api._blockReader, tx, txnIndex, api._agg, api.historyV3(tx))
+	msg, _, _, _, _, err := transactions.ComputeTxEnv(ctx, engine, block, chainConfig,
+		api._blockReader, tx, int(txnIndex), api.historyV3(tx))
 	if err != nil {
 		return nil, err
 	}
@@ -183,8 +203,10 @@ func (api *PrivateDebugAPIImpl) SimulateTxAtIndex(ctx context.Context, hash comm
 	if block == nil {
 		return nil, fmt.Errorf("got empty block")
 	}
+	engine := api.engine()
 	_, blockCtx, txCtx, ibs, _, err := transactions.ComputeTxEnv(
-		ctx, block, chainConfig, api._blockReader, tx, txIndex, api._agg, api.historyV3(tx))
+		ctx, engine, block, chainConfig, api._blockReader, tx,
+		int(txIndex), api.historyV3(tx))
 	if err != nil {
 		return nil, err
 	}
@@ -350,49 +372,70 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlockRaw(ctx context.Context, blockNr
 		return nil, fmt.Errorf("block %d not found", blockNr)
 	}
 
-	chainConfig, err := api.chainConfig(tx)
+	// if we've pruned this history away for this block then just return early
+	// to save any red herring errors
+	err = api.BaseAPI.checkPruneHistory(tx, block.NumberU64())
 	if err != nil {
 		return nil, err
 	}
 
-	_, blockCtx, _, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig,
-		api._blockReader, tx, 0, api._agg, api.historyV3(tx))
+	if config.BorTraceEnabled == nil {
+		config.BorTraceEnabled = newBoolPtr(false)
+	}
+
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		return nil, err
+	}
+	engine := api.engine()
+
+	_, blockCtx, _, ibs, _, err := transactions.ComputeTxEnv(ctx, engine, block,
+		chainConfig, api._blockReader, tx, 0, api.historyV3(tx))
 	if err != nil {
 		return nil, err
 	}
 
 	signer := types.MakeSigner(chainConfig, block.NumberU64())
+	rules := chainConfig.Rules(block.NumberU64(), block.Time())
 	rets := make([]protobuf.TraceTransaction, len(block.Transactions()))
 
-	for idx, tx := range block.Transactions() {
+	for idx, txn := range block.Transactions() {
 		select {
 		default:
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}
-		ibs.Prepare(tx.Hash(), block.Hash(), idx)
+		ibs.Prepare(txn.Hash(), block.Hash(), idx)
 
-		rules := chainConfig.Rules(block.NumberU64())
-		msg, _ := tx.AsMessage(*signer, block.BaseFee(), rules)
-		txCtx := vm.TxContext{
-			TxHash:   tx.Hash(),
+		msg, _ := txn.AsMessage(*signer, block.BaseFee(), rules)
+		if msg.FeeCap().IsZero() && engine != nil {
+			syscall := func(contract common.Address, data []byte) ([]byte, error) {
+				return core.SysCallContract(contract, data, *chainConfig, ibs, block.Header(), engine, true /* constCall */)
+			}
+			msg.SetIsFree(engine.IsServiceTransaction(msg.From(), syscall))
+		}
+
+		txCtx := evmtypes.TxContext{
+			TxHash:   txn.Hash(),
 			Origin:   msg.From(),
-			GasPrice: msg.GasPrice().ToBig(),
+			GasPrice: msg.GasPrice(),
 		}
 
 		tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
-		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), state.NewNoopWriter())
+		if err == nil {
+			err = ibs.FinalizeTx(rules, state.NewNoopWriter())
+		}
 		if err != nil {
 			// TODO handle trace transaction error
-			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)
+			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", txn.Hash(), err)
 		}
 
 		var baseFee *big.Int
 		if chainConfig.IsLondon(block.Number().Uint64()) && block.Hash() != (common.Hash{}) {
 			baseFee = block.BaseFee()
 		}
-		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
-		pbTx := toPbTraceTransaction(rtx, tx, tracerResult, int64(block.Time()))
+		rtx := newRPCTransaction(txn, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
+		pbTx := toPbTraceTransaction(rtx, txn, tracerResult, int64(block.Time()))
 		rets[idx] = pbTx
 	}
 	return rets, nil
@@ -413,49 +456,70 @@ func (api *PrivateDebugAPIImpl) TraceSingleBlock(ctx context.Context, blockNr rp
 		return fmt.Errorf("block %d not found", blockNr)
 	}
 
-	chainConfig, err := api.chainConfig(tx)
+	// if we've pruned this history away for this block then just return early
+	// to save any red herring errors
+	err = api.BaseAPI.checkPruneHistory(tx, block.NumberU64())
 	if err != nil {
 		return err
 	}
 
-	_, blockCtx, _, ibs, _, err := transactions.ComputeTxEnv(ctx, block, chainConfig,
-		api._blockReader, tx, 0, api._agg, api.historyV3(tx))
+	if config.BorTraceEnabled == nil {
+		config.BorTraceEnabled = newBoolPtr(false)
+	}
+
+	chainConfig, err := api.chainConfig(tx)
+	if err != nil {
+		return err
+	}
+	engine := api.engine()
+
+	_, blockCtx, _, ibs, _, err := transactions.ComputeTxEnv(ctx, engine, block,
+		chainConfig, api._blockReader, tx, 0, api.historyV3(tx))
 	if err != nil {
 		return err
 	}
 
 	signer := types.MakeSigner(chainConfig, block.NumberU64())
+	rules := chainConfig.Rules(block.NumberU64(), block.Time())
 
 	out := jsonpb.Marshaler{EmitDefaults: true}
-	for idx, tx := range block.Transactions() {
+	for idx, txn := range block.Transactions() {
 		select {
 		default:
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-		ibs.Prepare(tx.Hash(), block.Hash(), idx)
+		ibs.Prepare(txn.Hash(), block.Hash(), idx)
 
-		rules := chainConfig.Rules(block.NumberU64())
-		msg, _ := tx.AsMessage(*signer, block.BaseFee(), rules)
-		txCtx := vm.TxContext{
-			TxHash:   tx.Hash(),
+		msg, _ := txn.AsMessage(*signer, block.BaseFee(), rules)
+		if msg.FeeCap().IsZero() && engine != nil {
+			syscall := func(contract common.Address, data []byte) ([]byte, error) {
+				return core.SysCallContract(contract, data, *chainConfig, ibs, block.Header(), engine, true /* constCall */)
+			}
+			msg.SetIsFree(engine.IsServiceTransaction(msg.From(), syscall))
+		}
+
+		txCtx := evmtypes.TxContext{
+			TxHash:   txn.Hash(),
 			Origin:   msg.From(),
-			GasPrice: msg.GasPrice().ToBig(),
+			GasPrice: msg.GasPrice(),
 		}
 
 		tracerResult, err := trace.TraceTxByOpsTracer(ctx, msg, blockCtx, txCtx, ibs, config, chainConfig)
-		_ = ibs.FinalizeTx(chainConfig.Rules(blockCtx.BlockNumber), state.NewNoopWriter())
+		if err == nil {
+			err = ibs.FinalizeTx(rules, state.NewNoopWriter())
+		}
 		if err != nil {
 			// TODO handle trace transaction error
-			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", tx.Hash(), err)
+			zap.L().Sugar().Errorf("TraceTxByOpsTracer error: %s %s", txn.Hash(), err)
 		}
 
 		var baseFee *big.Int
 		if chainConfig.IsLondon(block.Number().Uint64()) && block.Hash() != (common.Hash{}) {
 			baseFee = block.BaseFee()
 		}
-		rtx := newRPCTransaction(tx, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
-		pbTx := toPbTraceTransaction(rtx, tx, tracerResult, int64(block.Time()))
+		rtx := newRPCTransaction(txn, block.Hash(), block.NumberU64(), uint64(idx), baseFee)
+		pbTx := toPbTraceTransaction(rtx, txn, tracerResult, int64(block.Time()))
 		if err := out.Marshal(output, &pbTx); err != nil {
 			return fmt.Errorf("failed to encode transaction: %s", err)
 		}
@@ -509,7 +573,7 @@ func toPbTraceTransaction(rtx *RPCTransaction, tx types.Transaction, tc *trace.O
 		FromAddress:      strings.ToLower(rtx.From.String()),
 		ToAddress:        to,
 		GasPrice:         rtx.GasPrice.ToInt().Int64(),
-		Input:            hexutil.Encode(tx.GetData()),
+		Input:            hexutility.Encode(tx.GetData()),
 		Nonce:            int64(tx.GetNonce()),
 		TransactionValue: tx.GetValue().String(),
 		Stack:            toPbCallTrace(tc),

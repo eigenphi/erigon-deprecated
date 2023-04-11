@@ -15,7 +15,6 @@ import (
 func main() {
 	cmd, cfg := cli.RootCommand()
 	rootCtx, rootCancel := common.RootContext()
-	cmd.AddCommand(commands.GetExportCmd(cfg, rootCtx, rootCancel))
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		logger := logging.GetLoggerCmd("rpcdaemon", cmd)
