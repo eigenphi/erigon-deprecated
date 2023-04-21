@@ -90,7 +90,7 @@ func Test_exportParquetWithData(t *testing.T) {
 		},
 	}
 
-	if err := exportParquetWithData(file, data); err != nil {
+	if err := ExportParquetWithData(file, data); err != nil {
 		t.Fatal(err)
 	}
 }

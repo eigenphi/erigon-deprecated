@@ -299,7 +299,7 @@ func (api *PrivateDebugAPIImpl) EigenphiPlainTraceByNumber(ctx context.Context, 
 	return json.NewEncoder(stream).Encode(rets)
 }
 
-func (api *PrivateDebugAPIImpl) getSimpleBlock(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
+func (api *PrivateDebugAPIImpl) GetSimpleBlock(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
 		return err
@@ -323,7 +323,7 @@ func (api *PrivateDebugAPIImpl) getSimpleBlock(ctx context.Context, blockNr rpc.
 	return nil
 }
 
-func (api *PrivateDebugAPIImpl) getSimpleTx(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
+func (api *PrivateDebugAPIImpl) GetSimpleTx(ctx context.Context, blockNr rpc.BlockNumber, output *os.File) error {
 	tx, err := api.db.BeginRo(ctx)
 	if err != nil {
 		return err

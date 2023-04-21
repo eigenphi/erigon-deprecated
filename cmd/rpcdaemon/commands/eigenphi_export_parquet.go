@@ -65,7 +65,7 @@ func dfs(node *protobuf.StackFrame, prefix string, sks *[]PlainStackFrame) {
 	}
 }
 
-func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
+func (e *ExportTraceParquet) SetFromPb(tx *protobuf.TraceTransaction) {
 	if e == nil {
 		panic("receiver: ExportTraceParquet is nil")
 	}
@@ -85,7 +85,7 @@ func (e *ExportTraceParquet) setFromPb(tx *protobuf.TraceTransaction) {
 	dfs(tx.Stack, "0", &e.Stack)
 }
 
-func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
+func ExportParquet(filename string, traces []protobuf.TraceTransaction) error {
 	tmpfile := filename + ".tmp"
 	tmpf, err := os.OpenFile(tmpfile, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
@@ -95,16 +95,16 @@ func exportParquet(filename string, traces []protobuf.TraceTransaction) error {
 
 	var data = make([]ExportTraceParquet, len(traces))
 	for i := range traces {
-		data[i].setFromPb(&traces[i])
+		data[i].SetFromPb(&traces[i])
 	}
 
-	if err := exportParquetWithData(tmpf, data); err != nil {
+	if err := ExportParquetWithData(tmpf, data); err != nil {
 		return fmt.Errorf("export parquet file to %s: %w", tmpfile, err)
 	}
 	return os.Rename(tmpfile, filename)
 }
 
-func exportParquetWithData(writer io.Writer, data []ExportTraceParquet) error {
+func ExportParquetWithData(writer io.Writer, data []ExportTraceParquet) error {
 
 	psc, err := schema.NewSchemaFromStruct(&ExportTraceParquet{})
 	if err != nil {
